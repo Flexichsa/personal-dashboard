@@ -38,7 +38,21 @@ function extractOcrLines(text: string): string[] {
   return text
     .split(/[\n\r]+/)
     .map(l => l.replace(/\s+/g, ' ').trim())
-    .filter(l => l.length > 2);
+    .filter(l => {
+      if (l.length < 4) return false;
+      const letters = (l.match(/[a-zA-ZÄÖÜäöüß]/g) ?? []).length;
+      if (letters < 2) return false;           // mostly symbols/numbers = noise
+      if (letters / l.length < 0.35) return false; // too few letters relative to length
+      return true;
+    });
+}
+
+function isHeic(file: File): boolean {
+  return (
+    file.type === 'image/heic' ||
+    file.type === 'image/heif' ||
+    /\.(heic|heif)$/i.test(file.name)
+  );
 }
 
 // Decode QR code from an image file → returns raw QR string or null
@@ -139,6 +153,7 @@ export default function ContactsWidget() {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   const [ocrLines, setOcrLines] = useState<string[]>([]);
+  const [scanError, setScanError] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const cardInputRef = useRef<HTMLInputElement>(null);
 
@@ -226,9 +241,17 @@ export default function ContactsWidget() {
   const handleCardScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setScanError(null);
+    setOcrLines([]);
+
+    if (isHeic(file)) {
+      setScanError('HEIC-Format nicht unterstützt. iPhone: Einstellungen → Kamera → Format → „Maximale Kompatibilität" (JPEG). Dann erneut scannen.');
+      e.target.value = '';
+      return;
+    }
+
     setOcrLoading(true);
     setOcrProgress(0);
-    setOcrLines([]);
     try {
       // 1. Try QR code first — gives perfectly structured data
       const qrData = await decodeQrFromFile(file);
@@ -357,7 +380,15 @@ export default function ContactsWidget() {
               </div>
             </div>
             <input type="file" ref={photoInputRef} accept="image/*" style={{ display: 'none' }} onChange={handlePhotoUpload} />
-            <input type="file" ref={cardInputRef} accept="image/*" style={{ display: 'none' }} onChange={handleCardScan} />
+            <input type="file" ref={cardInputRef} accept="image/jpeg,image/png,image/webp,image/gif" style={{ display: 'none' }} onChange={handleCardScan} />
+
+            {scanError && (
+              <div className="scan-error">
+                <X size={13} />
+                <span>{scanError}</span>
+                <button className="btn-icon-sm" onClick={() => setScanError(null)}><X size={11} /></button>
+              </div>
+            )}
 
             {/* OCR line picker */}
             {ocrLines.length > 0 && (

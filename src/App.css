@@ -866,6 +866,24 @@
   gap: 4px;
 }
 
+/* Scan error */
+.scan-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 10px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: #ef4444;
+  line-height: 1.4;
+}
+
+.scan-error svg { flex-shrink: 0; margin-top: 1px; }
+.scan-error span { flex: 1; }
+
 /* OCR line picker */
 .ocr-picker {
   background: var(--bg-widget);
