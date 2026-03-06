@@ -5,6 +5,7 @@ import {
   Camera, ChevronDown, ChevronRight, X, Check, Scan,
 } from 'lucide-react';
 import Tesseract from 'tesseract.js';
+import jsQR from 'jsqr';
 import WidgetWrapper from '../WidgetWrapper';
 import { useSupabase } from '../../hooks/useSupabase';
 import type { Contact } from '../../types';
@@ -38,6 +39,81 @@ function extractOcrLines(text: string): string[] {
     .split(/[\n\r]+/)
     .map(l => l.replace(/\s+/g, ' ').trim())
     .filter(l => l.length > 2);
+}
+
+// Decode QR code from an image file → returns raw QR string or null
+function decodeQrFromFile(file: File): Promise<string | null> {
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      resolve(code?.data ?? null);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+
+// Parse vCard or MeCard QR content into form fields
+function parseVCard(text: string): Partial<typeof EMPTY_FORM> | null {
+  const result: Partial<typeof EMPTY_FORM> = {};
+
+  // MeCard: MECARD:N:Last,First;TEL:...;EMAIL:...;ORG:...;;
+  if (text.startsWith('MECARD:')) {
+    const inner = text.replace(/^MECARD:/, '');
+    inner.split(';').forEach(part => {
+      const idx = part.indexOf(':');
+      if (idx === -1) return;
+      const key = part.slice(0, idx).trim().toUpperCase();
+      const val = part.slice(idx + 1).trim();
+      if (!val) return;
+      switch (key) {
+        case 'N':
+          // N:Last,First → "First Last"
+          result.name = val.split(',').reverse().join(' ').trim();
+          break;
+        case 'TEL': if (!result.phone) result.phone = val; break;
+        case 'EMAIL': if (!result.email) result.email = val.toLowerCase(); break;
+        case 'ORG': if (!result.company) result.company = val; break;
+      }
+    });
+    return Object.keys(result).length > 0 ? result : null;
+  }
+
+  // vCard 2.1 / 3.0 / 4.0
+  if (text.includes('BEGIN:VCARD')) {
+    text.split(/[\r\n]+/).forEach(line => {
+      const idx = line.indexOf(':');
+      if (idx === -1) return;
+      const rawKey = line.slice(0, idx).split(';')[0].toUpperCase();
+      const val = line.slice(idx + 1).trim();
+      if (!val) return;
+      switch (rawKey) {
+        case 'FN': if (!result.name) result.name = val; break;
+        case 'N':
+          // N:Last;First;Middle;Prefix;Suffix
+          if (!result.name) {
+            const parts = val.split(';');
+            result.name = [parts[1], parts[0]].filter(Boolean).join(' ').trim();
+          }
+          break;
+        case 'EMAIL': if (!result.email) result.email = val.toLowerCase(); break;
+        case 'TEL': if (!result.phone) result.phone = val; break;
+        case 'ORG': if (!result.company) result.company = val.split(';')[0]; break;
+      }
+    });
+    return Object.keys(result).length > 0 ? result : null;
+  }
+
+  return null;
 }
 
 function getInitials(name: string) {
@@ -154,6 +230,24 @@ export default function ContactsWidget() {
     setOcrProgress(0);
     setOcrLines([]);
     try {
+      // 1. Try QR code first — gives perfectly structured data
+      const qrData = await decodeQrFromFile(file);
+      if (qrData) {
+        const parsed = parseVCard(qrData);
+        if (parsed) {
+          setForm(f => ({
+            ...f,
+            name: parsed.name || f.name,
+            email: parsed.email || f.email,
+            phone: parsed.phone || f.phone,
+            company: parsed.company || f.company,
+          }));
+          setOcrLoading(false);
+          e.target.value = '';
+          return; // done — no OCR needed
+        }
+      }
+      // 2. No QR or unrecognized format → OCR with line picker
       const result = await Tesseract.recognize(file, 'deu+eng', {
         logger: m => { if (m.status === 'recognizing text') setOcrProgress(Math.round(m.progress * 100)); },
       });
