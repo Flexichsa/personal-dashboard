@@ -155,28 +155,6 @@ function sanitizeLayouts(saved: ResponsiveLayouts): ResponsiveLayouts {
   return result;
 }
 
-// Default pages — defined after generateDefaultLayouts
-const DEFAULT_PAGES: DashboardPage[] = [
-  {
-    id: 'uebersicht',
-    name: 'Übersicht',
-    visibleWidgets: ['passwords', 'contacts', 'notes', 'calendar', 'todos', 'weather', 'quotes', 'pomodoro', 'clocks'],
-    layouts: generateDefaultLayouts(['passwords', 'contacts', 'notes', 'calendar', 'todos', 'weather', 'quotes', 'pomodoro', 'clocks']),
-  },
-  {
-    id: 'arbeit',
-    name: 'Arbeit',
-    visibleWidgets: ['todos', 'notes', 'pomodoro', 'calendar', 'files', 'work-instructions'],
-    layouts: generateDefaultLayouts(['todos', 'notes', 'pomodoro', 'calendar', 'files', 'work-instructions']),
-  },
-  {
-    id: 'privat',
-    name: 'Privat',
-    visibleWidgets: ['finance', 'contacts', 'stickynotes', 'bookmarks', 'clocks', 'weather'],
-    layouts: generateDefaultLayouts(['finance', 'contacts', 'stickynotes', 'bookmarks', 'clocks', 'weather']),
-  },
-];
-
 // localStorage keys that contain migratable data
 const MIGRATE_KEYS: Record<string, string> = {
   'contacts': 'contacts',
@@ -233,6 +211,28 @@ const widthStore = {
   subscribe: (cb: () => void) => { window.addEventListener('resize', cb); return () => window.removeEventListener('resize', cb); },
   getSnapshot: () => window.innerWidth,
 };
+
+// Default pages — must be after GRID_COLS (uses generateDefaultLayouts → GRID_COLS)
+const DEFAULT_PAGES: DashboardPage[] = [
+  {
+    id: 'uebersicht',
+    name: 'Übersicht',
+    visibleWidgets: ['passwords', 'contacts', 'notes', 'calendar', 'todos', 'weather', 'quotes', 'pomodoro', 'clocks'],
+    layouts: generateDefaultLayouts(['passwords', 'contacts', 'notes', 'calendar', 'todos', 'weather', 'quotes', 'pomodoro', 'clocks']),
+  },
+  {
+    id: 'arbeit',
+    name: 'Arbeit',
+    visibleWidgets: ['todos', 'notes', 'pomodoro', 'calendar', 'files', 'work-instructions'],
+    layouts: generateDefaultLayouts(['todos', 'notes', 'pomodoro', 'calendar', 'files', 'work-instructions']),
+  },
+  {
+    id: 'privat',
+    name: 'Privat',
+    visibleWidgets: ['finance', 'contacts', 'stickynotes', 'bookmarks', 'clocks', 'weather'],
+    layouts: generateDefaultLayouts(['finance', 'contacts', 'stickynotes', 'bookmarks', 'clocks', 'weather']),
+  },
+];
 
 export default function App() {
   const { user, loading: authLoading, signOut } = useAuth();
