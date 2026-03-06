@@ -87,6 +87,7 @@ export default function ContactsWidget() {
   const [editId, setEditId] = useState<string | null>(null);
   const [groupByCompany, setGroupByCompany] = useState(true);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -155,8 +156,11 @@ export default function ContactsWidget() {
     setEditId(null);
   };
 
+  const confirmDelete = (id: string) => setConfirmDeleteId(id);
+
   const handleDelete = (id: string) => {
     setContacts(prev => prev.filter(c => c.id !== id));
+    setConfirmDeleteId(null);
     if (editId === id) { setShowForm(false); setEditId(null); }
   };
 
@@ -219,7 +223,15 @@ export default function ContactsWidget() {
           </div>
         )}
       </div>
-      <button className="btn-icon-sm delete-btn" onClick={() => handleDelete(c.id)}><Trash2 size={12} /></button>
+      {confirmDeleteId === c.id ? (
+        <div className="contact-confirm-delete">
+          <span>Löschen?</span>
+          <button className="btn-confirm-yes" onClick={() => handleDelete(c.id)}>Ja</button>
+          <button className="btn-confirm-no" onClick={() => setConfirmDeleteId(null)}>Nein</button>
+        </div>
+      ) : (
+        <button className="btn-icon-sm delete-btn" onClick={() => confirmDelete(c.id)}><Trash2 size={12} /></button>
+      )}
     </div>
   );
 
@@ -293,9 +305,17 @@ export default function ContactsWidget() {
                 <button className="btn-primary" onClick={handleSave}><Check size={14} /> Speichern</button>
                 <button className="btn-secondary" onClick={() => setShowForm(false)}>Abbrechen</button>
                 {editId && (
-                  <button className="btn-danger btn-sm" onClick={() => handleDelete(editId)}>
-                    <Trash2 size={13} /> Löschen
-                  </button>
+                  confirmDeleteId === editId ? (
+                    <div className="contact-confirm-delete">
+                      <span>Wirklich löschen?</span>
+                      <button className="btn-confirm-yes" onClick={() => handleDelete(editId)}>Ja</button>
+                      <button className="btn-confirm-no" onClick={() => setConfirmDeleteId(null)}>Nein</button>
+                    </div>
+                  ) : (
+                    <button className="btn-danger btn-sm" onClick={() => confirmDelete(editId)}>
+                      <Trash2 size={13} /> Löschen
+                    </button>
+                  )
                 )}
               </div>
             </div>
