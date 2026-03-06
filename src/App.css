@@ -3040,6 +3040,129 @@
   }
 }
 
+/* ===== PAGE TABS ===== */
+.page-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 12px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 2px 0;
+}
+
+.page-tabs::-webkit-scrollbar { display: none; }
+
+.page-tab {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.page-tab-btn {
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.page-tab-btn:hover {
+  background: var(--bg-input-focus);
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+}
+
+.page-tab.active .page-tab-btn {
+  background: rgba(124, 58, 237, 0.12);
+  border-color: rgba(124, 58, 237, 0.35);
+  color: var(--accent-hover);
+  font-weight: 600;
+}
+
+.page-tab-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 2px;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.page-tab:hover .page-tab-close,
+.page-tab.active .page-tab-close {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.page-tab-close:hover {
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--danger);
+}
+
+.page-tab-input {
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-input-focus);
+  border: 1px solid var(--accent);
+  color: var(--text-primary);
+  outline: none;
+  width: 110px;
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.page-tab-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.page-tab-add:hover {
+  background: var(--bg-input-focus);
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+}
+
+@media (max-width: 767px) {
+  .page-tab-btn {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+  .page-tab-add {
+    width: 26px;
+    height: 26px;
+  }
+}
+
 /* ===== CRYPTO WIDGET ===== */
 .crypto-widget {
   display: flex;

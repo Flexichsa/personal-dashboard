@@ -32,7 +32,8 @@ import NewsWidget from './components/widgets/NewsWidget';
 import FocusMusicWidget from './components/widgets/FocusMusicWidget';
 
 import { useLocalStorage } from './hooks/useLocalStorage';
-import { useSyncedSettings } from './hooks/useSyncedSettings';
+import { usePages } from './hooks/usePages';
+import type { DashboardPage } from './hooks/usePages';
 import { supabase } from './lib/supabase';
 
 import './App.css';
@@ -73,8 +74,6 @@ const WIDGET_DEFS: WidgetDef[] = [
 ];
 
 const CATEGORIES = ['Produktivität', 'Organisation', 'Tools', 'Sicherheit', 'Finanzen', 'Medien'];
-
-const DEFAULT_VISIBLE = ['passwords', 'contacts', 'notes', 'calendar', 'todos', 'weather', 'quotes', 'pomodoro', 'clocks'];
 
 interface LayoutItem {
   i: string;
@@ -156,6 +155,28 @@ function sanitizeLayouts(saved: ResponsiveLayouts): ResponsiveLayouts {
   return result;
 }
 
+// Default pages — defined after generateDefaultLayouts
+const DEFAULT_PAGES: DashboardPage[] = [
+  {
+    id: 'uebersicht',
+    name: 'Übersicht',
+    visibleWidgets: ['passwords', 'contacts', 'notes', 'calendar', 'todos', 'weather', 'quotes', 'pomodoro', 'clocks'],
+    layouts: generateDefaultLayouts(['passwords', 'contacts', 'notes', 'calendar', 'todos', 'weather', 'quotes', 'pomodoro', 'clocks']),
+  },
+  {
+    id: 'arbeit',
+    name: 'Arbeit',
+    visibleWidgets: ['todos', 'notes', 'pomodoro', 'calendar', 'files', 'work-instructions'],
+    layouts: generateDefaultLayouts(['todos', 'notes', 'pomodoro', 'calendar', 'files', 'work-instructions']),
+  },
+  {
+    id: 'privat',
+    name: 'Privat',
+    visibleWidgets: ['finance', 'contacts', 'stickynotes', 'bookmarks', 'clocks', 'weather'],
+    layouts: generateDefaultLayouts(['finance', 'contacts', 'stickynotes', 'bookmarks', 'clocks', 'weather']),
+  },
+];
+
 // localStorage keys that contain migratable data
 const MIGRATE_KEYS: Record<string, string> = {
   'contacts': 'contacts',
@@ -215,14 +236,25 @@ const widthStore = {
 
 export default function App() {
   const { user, loading: authLoading, signOut } = useAuth();
-  const { visibleWidgets, setVisibleWidgets, layouts, setLayouts, settingsLoading } = useSyncedSettings(
-    DEFAULT_VISIBLE,
-    generateDefaultLayouts(DEFAULT_VISIBLE)
-  );
+  const { pages, activePage, loading: pagesLoading, switchPage, addPage, deletePage, updatePage } = usePages(DEFAULT_PAGES);
+  const { visibleWidgets, layouts } = activePage;
+
+  const setVisibleWidgets = useCallback((value: string[] | ((prev: string[]) => string[])) => {
+    updatePage(activePage.id, p => ({ visibleWidgets: value instanceof Function ? value(p.visibleWidgets) : value }));
+  }, [updatePage, activePage.id]);
+
+  const setLayouts = useCallback((value: ResponsiveLayouts | ((prev: ResponsiveLayouts) => ResponsiveLayouts)) => {
+    updatePage(activePage.id, p => ({ layouts: value instanceof Function ? value(p.layouts) : value }));
+  }, [updatePage, activePage.id]);
+
   const [showWidgetPicker, setShowWidgetPicker] = useState(false);
   const [pickerSearch, setPickerSearch] = useState('');
   const [migrating, setMigrating] = useState(false);
   const [migrated, setMigrated] = useState(false);
+  const [editingPageId, setEditingPageId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const [addingPage, setAddingPage] = useState(false);
+  const [newPageName, setNewPageName] = useState('');
   const [theme, setTheme] = useLocalStorage<'light' | 'dark'>('theme', 'dark');
   const [maximizedWidget, setMaximizedWidget] = useState<string | null>(null);
 
@@ -292,8 +324,7 @@ export default function App() {
   };
 
   const resetLayouts = () => {
-    const newLayouts = generateDefaultLayouts(visibleWidgets);
-    setLayouts(newLayouts);
+    updatePage(activePage.id, { layouts: generateDefaultLayouts(activePage.visibleWidgets) });
   };
 
   const removeWidget = (id: string) => {
@@ -363,13 +394,13 @@ export default function App() {
   };
 
   const hiddenWidgets = useMemo(() => {
-    const hidden = WIDGET_DEFS.filter(d => !visibleWidgets.includes(d.id));
+    const hidden = WIDGET_DEFS.filter(d => !activePage.visibleWidgets.includes(d.id));
     if (!pickerSearch.trim()) return hidden;
     const q = pickerSearch.toLowerCase();
     return hidden.filter(d => d.label.toLowerCase().includes(q) || d.category.toLowerCase().includes(q));
-  }, [visibleWidgets, pickerSearch]);
+  }, [activePage.visibleWidgets, pickerSearch]);
 
-  if (authLoading || (user && settingsLoading)) {
+  if (authLoading || (user && pagesLoading)) {
     return (
       <div className="auth-page">
         <div className="auth-form-section">
@@ -440,6 +471,74 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {/* Page Tabs */}
+      <div className="page-tabs">
+        {pages.map(page => (
+          <div key={page.id} className={`page-tab ${page.id === activePage.id ? 'active' : ''}`}>
+            {editingPageId === page.id ? (
+              <input
+                className="page-tab-input"
+                value={editingName}
+                onChange={e => setEditingName(e.target.value)}
+                onBlur={() => {
+                  if (editingName.trim()) updatePage(editingPageId, { name: editingName.trim() });
+                  setEditingPageId(null);
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    if (editingName.trim()) updatePage(editingPageId, { name: editingName.trim() });
+                    setEditingPageId(null);
+                  }
+                  if (e.key === 'Escape') setEditingPageId(null);
+                }}
+                autoFocus
+              />
+            ) : (
+              <button
+                className="page-tab-btn"
+                onClick={() => switchPage(page.id)}
+                onDoubleClick={() => { setEditingPageId(page.id); setEditingName(page.name); }}
+              >
+                {page.name}
+              </button>
+            )}
+            {pages.length > 1 && (
+              <button
+                className="page-tab-close"
+                onClick={() => deletePage(page.id)}
+                title="Seite löschen"
+              >&times;</button>
+            )}
+          </div>
+        ))}
+        {addingPage ? (
+          <input
+            className="page-tab-input"
+            placeholder="Seitenname…"
+            value={newPageName}
+            onChange={e => setNewPageName(e.target.value)}
+            onBlur={() => {
+              if (newPageName.trim()) addPage(newPageName.trim(), { visibleWidgets: [], layouts: generateDefaultLayouts([]) });
+              setAddingPage(false);
+              setNewPageName('');
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                if (newPageName.trim()) addPage(newPageName.trim(), { visibleWidgets: [], layouts: generateDefaultLayouts([]) });
+                setAddingPage(false);
+                setNewPageName('');
+              }
+              if (e.key === 'Escape') { setAddingPage(false); setNewPageName(''); }
+            }}
+            autoFocus
+          />
+        ) : (
+          <button className="page-tab-add" onClick={() => setAddingPage(true)} title="Neue Seite hinzufügen">
+            <Plus size={13} />
+          </button>
+        )}
+      </div>
 
       {/* Widget Picker — Command Palette */}
       {showWidgetPicker && (
