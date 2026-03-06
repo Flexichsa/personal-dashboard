@@ -33,37 +33,82 @@ function compressToBase64(file: File): Promise<string> {
   });
 }
 
-function parseOcrText(text: string): Partial<typeof EMPTY_FORM> {
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  const result: Partial<typeof EMPTY_FORM> = {};
+function parseOcrText(text: string): Partial<typeof EMPTY_FORM> & { rawText: string } {
+  // Normalize lines
+  const lines = text
+    .split(/[\n\r]+/)
+    .map(l => l.replace(/\s+/g, ' ').trim())
+    .filter(l => l.length > 2);
 
-  const emailRx = /[\w._%+-]+@[\w.-]+\.[a-z]{2,}/i;
-  const phoneRx = /(?:\+?\d[\d\s\-().]{6,})/;
+  const result: Partial<typeof EMPTY_FORM> & { rawText: string } = { rawText: text.trim() };
 
+  // Regexes
+  const emailRx = /[\w._%+\-]+@[\w.\-]+\.[a-zA-Z]{2,}/i;
+  // German/EU phone formats: +49 89 123456, (030) 12345, 0800 123 456, +1-800-555-0000
+  const phoneRx = /(?:(?:\+|00)\d{1,3}[\s.\-]?)?(?:\(0?\d{1,5}\)[\s.\-]?)?\d{2,5}[\s.\-]\d{2,5}(?:[\s.\-]\d{1,5})?|\(\d{2,5}\)[\s.\-]?\d{4,}/;
+  // Proper name: 2–4 words, each starting with capital, no digits, no special chars
+  const nameRx = /^(?:(?:Dr|Prof|Dipl|Ing|Herr|Frau|Mr|Ms|Mrs)\.?\s+)?[A-ZÄÖÜ][a-zäöüß\-]{1,}(?:\s+[A-ZÄÖÜ][a-zäöüß\-]{1,}){1,3}$/;
+  const companyTerms = /GmbH|AG|Ltd\.?|Inc\.?|Corp\.?|Co\.|KG|OHG|e\.V\.|SE\b|GbR|LLC|S\.A\.|B\.V\.|Gruppe|Group|Solutions|Services|Consulting|Technologies|Systems|Digital|Media/i;
+  const jobTitleRx = /CEO|CFO|CTO|COO|Manager|Leiter|Director|Direktor|Geschäftsführer|Berater|Consultant|Engineer|Ingenieur|Entwickler|Designer|Vertrieb|Sales|Marketing|Assistenz|Assistent|Referent|Projektleiter|Produktmanager/i;
+  const urlRx = /https?:\/\/|www\./i;
+  const addrRx = /Str\.|Straße|Allee|Platz|Weg|Ring|Gasse|\d{5}\s+\w/i; // street or zip
+
+  // 1. Extract email
   for (const line of lines) {
-    if (!result.email) {
-      const m = line.match(emailRx);
-      if (m) result.email = m[0];
-    }
-    if (!result.phone) {
-      const m = line.match(phoneRx);
-      // Avoid matching things that look like zip codes or IPs
-      if (m && m[0].replace(/\D/g, '').length >= 7) result.phone = m[0].trim();
+    const m = line.match(emailRx);
+    if (m && !result.email) result.email = m[0].toLowerCase();
+  }
+
+  // 2. Extract phone (skip email/url lines)
+  for (const line of lines) {
+    if (emailRx.test(line) || urlRx.test(line)) continue;
+    // Remove label prefixes like "Tel:", "Fon:", "Mobil:"
+    const cleaned = line.replace(/^(Tel|Fon|Tel\.|Fax|Mobil|Mobile|Phone|Handy|T|F|M)\s*[:\-]?\s*/i, '');
+    const m = cleaned.match(phoneRx);
+    if (m && m[0].replace(/\D/g, '').length >= 6 && !result.phone) {
+      result.phone = m[0].trim();
     }
   }
 
-  // Longest line without digits is probably the name
-  const nameCandidates = lines
-    .filter(l => !emailRx.test(l) && !phoneRx.test(l))
-    .filter(l => l.length > 2 && l.length < 50 && /[a-zA-ZÄÖÜäöüß]/.test(l));
-  if (nameCandidates.length > 0) {
-    result.name = nameCandidates[0];
+  // 3. Candidate text lines (no email, no url, no address, no pure number lines)
+  const textLines = lines.filter(l =>
+    !emailRx.test(l) &&
+    !urlRx.test(l) &&
+    !addrRx.test(l) &&
+    !/^[\d\s\+\-().]+$/.test(l) // not a pure phone/number line
+  );
+
+  // 4. Company: explicit keywords first
+  const coLine = textLines.find(l => companyTerms.test(l));
+  if (coLine) result.company = coLine;
+
+  // 5. Company: ALL-CAPS lines (common on business cards)
+  if (!result.company) {
+    const allCaps = textLines.find(l => /^[A-ZÄÖÜ0-9\s&.\-]{4,40}$/.test(l) && /[A-ZÄÖÜ]{3}/.test(l));
+    if (allCaps) result.company = allCaps;
   }
-  // Company heuristic: second non-name line, or line with GmbH/AG/Ltd/Inc
-  const companyRx = /GmbH|AG|Ltd|Inc|Corp|Co\.|KG|OHG|e\.V\.|SE/i;
-  const companyLine = lines.find(l => companyRx.test(l));
-  if (companyLine) result.company = companyLine;
-  else if (nameCandidates.length > 1) result.company = nameCandidates[1];
+
+  // 6. Name: match proper name pattern, exclude job titles & company
+  const nameLine = textLines.find(l =>
+    nameRx.test(l) &&
+    !companyTerms.test(l) &&
+    !jobTitleRx.test(l) &&
+    l !== result.company
+  );
+  if (nameLine) result.name = nameLine;
+
+  // 7. Fallback name: first reasonable text line that isn't company/title
+  if (!result.name) {
+    const fallback = textLines.find(l =>
+      l.length > 3 && l.length < 50 &&
+      !companyTerms.test(l) &&
+      !jobTitleRx.test(l) &&
+      !addrRx.test(l) &&
+      l !== result.company &&
+      /[a-zA-ZÄÖÜäöüß]/.test(l)
+    );
+    if (fallback) result.name = fallback;
+  }
 
   return result;
 }
@@ -190,6 +235,8 @@ export default function ContactsWidget() {
         email: extracted.email || f.email,
         phone: extracted.phone || f.phone,
         company: extracted.company || f.company,
+        // Put raw OCR text in notes so user can copy missed fields manually
+        notes: f.notes || extracted.rawText.slice(0, 300),
       }));
     } catch { /* ignore */ }
     setOcrLoading(false);
@@ -300,7 +347,13 @@ export default function ContactsWidget() {
               <input placeholder="E-Mail" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
               <input placeholder="Telefon" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
               <input placeholder="Tags (kommagetrennt)" value={form.tags} onChange={e => setForm({ ...form, tags: e.target.value })} />
-              <input placeholder="Notizen" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+              <textarea
+                placeholder="Notizen (nach OCR: Rohtext der Visitenkarte)"
+                value={form.notes}
+                onChange={e => setForm({ ...form, notes: e.target.value })}
+                rows={3}
+                style={{ resize: 'vertical', fontFamily: 'inherit', fontSize: '12px' }}
+              />
               <div className="form-actions">
                 <button className="btn-primary" onClick={handleSave}><Check size={14} /> Speichern</button>
                 <button className="btn-secondary" onClick={() => setShowForm(false)}>Abbrechen</button>
