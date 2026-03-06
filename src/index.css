@@ -52,6 +52,10 @@
   --color-finance: #34d399;
   --color-hardware: #818cf8;
   --color-work-instructions: #38bdf8;
+  --color-crypto: #f59e0b;
+  --color-stocks: #34d399;
+  --color-news: #60a5fa;
+  --color-music: #ec4899;
 
   /* Radius */
   --radius-sm: 12px;

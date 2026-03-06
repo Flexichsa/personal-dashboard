@@ -4,6 +4,7 @@ import type { ResponsiveLayouts, Layout } from 'react-grid-layout';
 import {
   Lock, Users, FileText, Bookmark, Calendar, CheckSquare,
   Cloud, Clock, StickyNote, FolderOpen, Timer, Quote, Wallet, Cpu, ClipboardList,
+  TrendingUp, BarChart2, Newspaper, Music,
   Plus, LayoutGrid, LogOut, Upload, Search, Sun, Moon, RotateCcw
 } from 'lucide-react';
 import 'react-grid-layout/css/styles.css';
@@ -25,6 +26,10 @@ import QuotesWidget from './components/widgets/QuotesWidget';
 import FinanceWidget from './components/widgets/FinanceWidget';
 import HardwareWidget from './components/widgets/HardwareWidget';
 import WorkInstructionsWidget from './components/widgets/WorkInstructionsWidget';
+import CryptoWidget from './components/widgets/CryptoWidget';
+import StocksWidget from './components/widgets/StocksWidget';
+import NewsWidget from './components/widgets/NewsWidget';
+import FocusMusicWidget from './components/widgets/FocusMusicWidget';
 
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useSyncedSettings } from './hooks/useSyncedSettings';
@@ -61,9 +66,13 @@ const WIDGET_DEFS: WidgetDef[] = [
   { id: 'finance', label: 'Finanzen', category: 'Tools', icon: <Wallet size={14} />, color: '#10b981', component: <FinanceWidget />, defaultW: 4, defaultH: 6, minW: 2, minH: 3 },
   { id: 'hardware', label: 'Hardware', category: 'Organisation', icon: <Cpu size={14} />, color: '#6366f1', component: <HardwareWidget />, defaultW: 4, defaultH: 6, minW: 2, minH: 3 },
   { id: 'work-instructions', label: 'Arbeitsanweisungen', category: 'Produktivität', icon: <ClipboardList size={14} />, color: '#0ea5e9', component: <WorkInstructionsWidget />, defaultW: 4, defaultH: 6, minW: 2, minH: 3 },
+  { id: 'crypto', label: 'Krypto', category: 'Finanzen', icon: <TrendingUp size={14} />, color: '#f59e0b', component: <CryptoWidget />, defaultW: 3, defaultH: 5, minW: 2, minH: 3 },
+  { id: 'stocks', label: 'Aktien', category: 'Finanzen', icon: <BarChart2 size={14} />, color: '#34d399', component: <StocksWidget />, defaultW: 3, defaultH: 5, minW: 2, minH: 3 },
+  { id: 'news', label: 'News', category: 'Medien', icon: <Newspaper size={14} />, color: '#60a5fa', component: <NewsWidget />, defaultW: 4, defaultH: 6, minW: 2, minH: 3 },
+  { id: 'music', label: 'Focus Music', category: 'Medien', icon: <Music size={14} />, color: '#ec4899', component: <FocusMusicWidget />, defaultW: 3, defaultH: 5, minW: 2, minH: 3 },
 ];
 
-const CATEGORIES = ['Produktivität', 'Organisation', 'Tools', 'Sicherheit'];
+const CATEGORIES = ['Produktivität', 'Organisation', 'Tools', 'Sicherheit', 'Finanzen', 'Medien'];
 
 const DEFAULT_VISIBLE = ['passwords', 'contacts', 'notes', 'calendar', 'todos', 'weather', 'quotes', 'pomodoro', 'clocks'];
 
@@ -77,6 +86,20 @@ interface LayoutItem {
   minH?: number;
 }
 
+// Returns the appropriate widget width for a given column count
+function getWidgetWidth(defaultW: number, minW: number, cols: number): number {
+  if (cols <= 4) {
+    // Mobile: full-width for large widgets, half for small
+    return Math.min(defaultW >= 3 ? cols : Math.ceil(cols / 2), cols);
+  }
+  if (cols <= 10) {
+    // Tablet: proportional scale from 12-col baseline
+    return Math.max(minW, Math.min(Math.round(defaultW * cols / 12), cols));
+  }
+  // Desktop: use defaultW as-is
+  return Math.min(defaultW, cols);
+}
+
 function generateLayoutForCols(visibleIds: string[], cols: number): LayoutItem[] {
   const items: LayoutItem[] = [];
   let x = 0, y = 0, rowMaxH = 0;
@@ -85,8 +108,7 @@ function generateLayoutForCols(visibleIds: string[], cols: number): LayoutItem[]
     const def = WIDGET_DEFS.find(d => d.id === id);
     if (!def) return;
 
-    // Scale widget width proportionally to available cols
-    const w = cols <= 6 ? 2 : Math.min(def.defaultW, cols);
+    const w = getWidgetWidth(def.defaultW, def.minW, cols);
     const minW = Math.min(def.minW, cols);
 
     if (x + w > cols) {
@@ -120,12 +142,13 @@ function sanitizeLayouts(saved: ResponsiveLayouts): ResponsiveLayouts {
     result[bp] = items.map(item => {
       const def = WIDGET_DEFS.find(d => d.id === item.i);
       if (!def) return item;
-      const targetW = cols <= 6 ? Math.min(def.defaultW, cols) : def.defaultW;
+      const minW = Math.min(def.minW, cols);
       return {
         ...item,
-        minW: def.minW,
+        minW,
         minH: def.minH,
-        w: Math.max(item.w, targetW),
+        // Clamp width: respect user resizing but enforce minW and col limit
+        w: Math.max(Math.min(item.w, cols), minW),
         h: Math.max(item.h, def.minH),
       };
     }) as Layout;
@@ -174,11 +197,14 @@ function formatDate(): string {
 
 // Grid config as stable references (prevents re-renders during drag)
 const GRID_BREAKPOINTS = { lg: 1200, md: 768, sm: 0 };
-const GRID_COLS = { lg: 12, md: 6, sm: 6 };
+// lg=Desktop (1200+): 12 cols | md=Tablet (768-1200): 10 cols | sm=Mobile (<768): 4 cols
+const GRID_COLS = { lg: 12, md: 10, sm: 4 };
 const GRID_MARGIN: [number, number] = [16, 16];
+const GRID_MARGIN_TABLET: [number, number] = [12, 12];
 const GRID_MARGIN_MOBILE: [number, number] = [8, 8];
 const ROW_HEIGHT = 60;
-const ROW_HEIGHT_MOBILE = 40;
+const ROW_HEIGHT_TABLET = 55;
+const ROW_HEIGHT_MOBILE = 50;
 const DRAG_CONFIG = { handle: '.widget-header', cancel: 'button, a, input, textarea, select' };
 
 // Lightweight window width subscription for responsive margin
@@ -203,8 +229,9 @@ export default function App() {
   const { width, containerRef, mounted } = useContainerWidth({ initialWidth: typeof window !== 'undefined' ? window.innerWidth - 32 : 1200 });
   const windowWidth = useSyncExternalStore(widthStore.subscribe, widthStore.getSnapshot);
   const isMobile = windowWidth < 768;
-  const gridMargin = isMobile ? GRID_MARGIN_MOBILE : GRID_MARGIN;
-  const rowHeight = isMobile ? ROW_HEIGHT_MOBILE : ROW_HEIGHT;
+  const isTablet = windowWidth >= 768 && windowWidth < 1200;
+  const gridMargin = isMobile ? GRID_MARGIN_MOBILE : isTablet ? GRID_MARGIN_TABLET : GRID_MARGIN;
+  const rowHeight = isMobile ? ROW_HEIGHT_MOBILE : isTablet ? ROW_HEIGHT_TABLET : ROW_HEIGHT;
   const sanitizedLayouts = useMemo(() => sanitizeLayouts(layouts), [layouts]);
 
   // Apply theme
@@ -248,7 +275,7 @@ export default function App() {
       const updated: ResponsiveLayouts = {};
       for (const bp of Object.keys(prev)) {
         const bpCols = GRID_COLS[bp as keyof typeof GRID_COLS] || 12;
-        const w = Math.min(def.defaultW, bpCols);
+        const w = getWidgetWidth(def.defaultW, def.minW, bpCols);
         const minW = Math.min(def.minW, bpCols);
         const newItem: LayoutItem = {
           i: id, x: 0, y: Infinity, w, h: def.defaultH, minW, minH: def.minH,
@@ -472,6 +499,14 @@ export default function App() {
           >
             <Plus size={20} />
             <span>Widget</span>
+          </button>
+          <button
+            className="mobile-action-btn"
+            onClick={resetLayouts}
+            title="Layout zurücksetzen"
+          >
+            <RotateCcw size={20} />
+            <span>Reset</span>
           </button>
           <button
             className="mobile-action-btn"

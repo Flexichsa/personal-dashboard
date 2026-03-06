@@ -48,46 +48,61 @@ export default function PomodoroWidget() {
   const totalSessions = state.totalSessions || 0;
 
   useEffect(() => {
-    if (running && timeLeft > 0) {
-      intervalRef.current = window.setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            setRunning(false);
-            // Play notification sound
-            try {
-              const audio = new AudioContext();
-              const osc = audio.createOscillator();
-              const gain = audio.createGain();
-              osc.connect(gain);
-              gain.connect(audio.destination);
-              osc.frequency.value = 800;
-              gain.gain.value = 0.3;
-              osc.start();
-              osc.stop(audio.currentTime + 0.5);
-            } catch {
-              // audio not supported
-            }
-            if (mode === 'focus') {
-              // Persist session count
+    if (!running) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      return;
+    }
+
+    intervalRef.current = window.setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          setRunning(false);
+          // Play notification sound
+          try {
+            const audio = new AudioContext();
+            const osc = audio.createOscillator();
+            const gain = audio.createGain();
+            osc.connect(gain);
+            gain.connect(audio.destination);
+            osc.frequency.value = 800;
+            gain.gain.value = 0.3;
+            osc.start();
+            osc.stop(audio.currentTime + 0.5);
+          } catch {
+            // audio not supported
+          }
+          if (mode === 'focus') {
+            // Use functional update to avoid stale closure on state
+            setStateArr(prevArr => {
+              const s = prevArr[0] || DEFAULT_STATE;
               const d = today();
-              const todaySess = state.todayDate === d ? state.todaySessions + 1 : 1;
-              setStateArr([{
-                ...state,
-                totalSessions: (state.totalSessions || 0) + 1,
+              const todaySess = s.todayDate === d ? s.todaySessions + 1 : 1;
+              return [{
+                ...s,
+                totalSessions: (s.totalSessions || 0) + 1,
                 todaySessions: todaySess,
                 todayDate: d,
-              }]);
-            }
-            return 0;
+              }];
+            });
           }
-          return prev - 1;
-        });
-      }, 1000);
-    }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     };
-  }, [running, mode, timeLeft]);
+  // timeLeft intentionally excluded: setTimeLeft functional form handles tick without recreating interval
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running, mode]);
 
   const switchMode = (newMode: Mode) => {
     setMode(newMode);
