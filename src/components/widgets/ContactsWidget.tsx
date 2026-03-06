@@ -33,84 +33,11 @@ function compressToBase64(file: File): Promise<string> {
   });
 }
 
-function parseOcrText(text: string): Partial<typeof EMPTY_FORM> & { rawText: string } {
-  // Normalize lines
-  const lines = text
+function extractOcrLines(text: string): string[] {
+  return text
     .split(/[\n\r]+/)
     .map(l => l.replace(/\s+/g, ' ').trim())
     .filter(l => l.length > 2);
-
-  const result: Partial<typeof EMPTY_FORM> & { rawText: string } = { rawText: text.trim() };
-
-  // Regexes
-  const emailRx = /[\w._%+\-]+@[\w.\-]+\.[a-zA-Z]{2,}/i;
-  // German/EU phone formats: +49 89 123456, (030) 12345, 0800 123 456, +1-800-555-0000
-  const phoneRx = /(?:(?:\+|00)\d{1,3}[\s.\-]?)?(?:\(0?\d{1,5}\)[\s.\-]?)?\d{2,5}[\s.\-]\d{2,5}(?:[\s.\-]\d{1,5})?|\(\d{2,5}\)[\s.\-]?\d{4,}/;
-  // Proper name: 2–4 words, each starting with capital, no digits, no special chars
-  const nameRx = /^(?:(?:Dr|Prof|Dipl|Ing|Herr|Frau|Mr|Ms|Mrs)\.?\s+)?[A-ZÄÖÜ][a-zäöüß\-]{1,}(?:\s+[A-ZÄÖÜ][a-zäöüß\-]{1,}){1,3}$/;
-  const companyTerms = /GmbH|AG|Ltd\.?|Inc\.?|Corp\.?|Co\.|KG|OHG|e\.V\.|SE\b|GbR|LLC|S\.A\.|B\.V\.|Gruppe|Group|Solutions|Services|Consulting|Technologies|Systems|Digital|Media/i;
-  const jobTitleRx = /CEO|CFO|CTO|COO|Manager|Leiter|Director|Direktor|Geschäftsführer|Berater|Consultant|Engineer|Ingenieur|Entwickler|Designer|Vertrieb|Sales|Marketing|Assistenz|Assistent|Referent|Projektleiter|Produktmanager/i;
-  const urlRx = /https?:\/\/|www\./i;
-  const addrRx = /Str\.|Straße|Allee|Platz|Weg|Ring|Gasse|\d{5}\s+\w/i; // street or zip
-
-  // 1. Extract email
-  for (const line of lines) {
-    const m = line.match(emailRx);
-    if (m && !result.email) result.email = m[0].toLowerCase();
-  }
-
-  // 2. Extract phone (skip email/url lines)
-  for (const line of lines) {
-    if (emailRx.test(line) || urlRx.test(line)) continue;
-    // Remove label prefixes like "Tel:", "Fon:", "Mobil:"
-    const cleaned = line.replace(/^(Tel|Fon|Tel\.|Fax|Mobil|Mobile|Phone|Handy|T|F|M)\s*[:\-]?\s*/i, '');
-    const m = cleaned.match(phoneRx);
-    if (m && m[0].replace(/\D/g, '').length >= 6 && !result.phone) {
-      result.phone = m[0].trim();
-    }
-  }
-
-  // 3. Candidate text lines (no email, no url, no address, no pure number lines)
-  const textLines = lines.filter(l =>
-    !emailRx.test(l) &&
-    !urlRx.test(l) &&
-    !addrRx.test(l) &&
-    !/^[\d\s\+\-().]+$/.test(l) // not a pure phone/number line
-  );
-
-  // 4. Company: explicit keywords first
-  const coLine = textLines.find(l => companyTerms.test(l));
-  if (coLine) result.company = coLine;
-
-  // 5. Company: ALL-CAPS lines (common on business cards)
-  if (!result.company) {
-    const allCaps = textLines.find(l => /^[A-ZÄÖÜ0-9\s&.\-]{4,40}$/.test(l) && /[A-ZÄÖÜ]{3}/.test(l));
-    if (allCaps) result.company = allCaps;
-  }
-
-  // 6. Name: match proper name pattern, exclude job titles & company
-  const nameLine = textLines.find(l =>
-    nameRx.test(l) &&
-    !companyTerms.test(l) &&
-    !jobTitleRx.test(l) &&
-    l !== result.company
-  );
-  if (nameLine) result.name = nameLine;
-
-  // 7. Fallback name: first reasonable text line that isn't company/title
-  if (!result.name) {
-    const fallback = textLines.find(l =>
-      l.length > 3 && l.length < 50 &&
-      !companyTerms.test(l) &&
-      !jobTitleRx.test(l) &&
-      !addrRx.test(l) &&
-      l !== result.company &&
-      /[a-zA-ZÄÖÜäöüß]/.test(l)
-    );
-    if (fallback) result.name = fallback;
-  }
-
-  return result;
 }
 
 function getInitials(name: string) {
@@ -135,6 +62,7 @@ export default function ContactsWidget() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
+  const [ocrLines, setOcrLines] = useState<string[]>([]);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const cardInputRef = useRef<HTMLInputElement>(null);
 
@@ -224,23 +152,19 @@ export default function ContactsWidget() {
     if (!file) return;
     setOcrLoading(true);
     setOcrProgress(0);
+    setOcrLines([]);
     try {
       const result = await Tesseract.recognize(file, 'deu+eng', {
         logger: m => { if (m.status === 'recognizing text') setOcrProgress(Math.round(m.progress * 100)); },
       });
-      const extracted = parseOcrText(result.data.text);
-      setForm(f => ({
-        ...f,
-        name: extracted.name || f.name,
-        email: extracted.email || f.email,
-        phone: extracted.phone || f.phone,
-        company: extracted.company || f.company,
-        // Put raw OCR text in notes so user can copy missed fields manually
-        notes: f.notes || extracted.rawText.slice(0, 300),
-      }));
+      setOcrLines(extractOcrLines(result.data.text));
     } catch { /* ignore */ }
     setOcrLoading(false);
     e.target.value = '';
+  };
+
+  const assignOcrLine = (line: string, field: 'name' | 'company' | 'email' | 'phone') => {
+    setForm(f => ({ ...f, [field]: line }));
   };
 
   const toggleGroup = (key: string) => {
@@ -341,6 +265,30 @@ export default function ContactsWidget() {
             <input type="file" ref={photoInputRef} accept="image/*" style={{ display: 'none' }} onChange={handlePhotoUpload} />
             <input type="file" ref={cardInputRef} accept="image/*" style={{ display: 'none' }} onChange={handleCardScan} />
 
+            {/* OCR line picker */}
+            {ocrLines.length > 0 && (
+              <div className="ocr-picker">
+                <div className="ocr-picker-header">
+                  <Scan size={13} />
+                  <span>Visitenkarte erkannt — Zeile zuweisen:</span>
+                  <button className="btn-icon-sm" onClick={() => setOcrLines([])}><X size={12} /></button>
+                </div>
+                <div className="ocr-picker-lines">
+                  {ocrLines.map((line, i) => (
+                    <div key={i} className="ocr-line">
+                      <span className="ocr-line-text">{line}</span>
+                      <div className="ocr-line-btns">
+                        <button onClick={() => assignOcrLine(line, 'name')} title="Als Name übernehmen">Name</button>
+                        <button onClick={() => assignOcrLine(line, 'company')} title="Als Firma übernehmen">Firma</button>
+                        <button onClick={() => assignOcrLine(line, 'email')} title="Als E-Mail übernehmen">Mail</button>
+                        <button onClick={() => assignOcrLine(line, 'phone')} title="Als Telefon übernehmen">Tel</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="vault-form">
               <input placeholder="Name *" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
               <input placeholder="Firma" value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} />
@@ -348,7 +296,7 @@ export default function ContactsWidget() {
               <input placeholder="Telefon" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
               <input placeholder="Tags (kommagetrennt)" value={form.tags} onChange={e => setForm({ ...form, tags: e.target.value })} />
               <textarea
-                placeholder="Notizen (nach OCR: Rohtext der Visitenkarte)"
+                placeholder="Notizen"
                 value={form.notes}
                 onChange={e => setForm({ ...form, notes: e.target.value })}
                 rows={3}
