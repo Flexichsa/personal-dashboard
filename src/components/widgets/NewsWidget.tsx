@@ -14,7 +14,7 @@ const FEEDS = [
   { id: 'tagesschau', label: 'Tagesschau', url: 'https://www.tagesschau.de/xml/rss2' },
   { id: 'heise', label: 'Heise Online', url: 'https://www.heise.de/rss/heise.rdf' },
   { id: 'spiegel', label: 'Spiegel', url: 'https://www.spiegel.de/schlagzeilen/tops/index.rss' },
-  { id: 'bbc', label: 'BBC News', url: 'http://feeds.bbci.co.uk/news/rss.xml' },
+  { id: 'bbc', label: 'BBC News', url: 'https://feeds.bbci.co.uk/news/rss.xml' },
   { id: 'hn', label: 'Hacker News', url: 'https://news.ycombinator.com/rss' },
   { id: 'golem', label: 'Golem.de', url: 'https://rss.golem.de/rss.php?feed=RSS2.0' },
 ];
@@ -31,6 +31,31 @@ const formatDate = (dateStr: string) => {
   }
 };
 
+function parseRss(xml: string): NewsItem[] {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'text/xml');
+
+  // RSS 2.0
+  const rssItems = Array.from(doc.querySelectorAll('channel > item'));
+  if (rssItems.length > 0) {
+    return rssItems.slice(0, 20).map(item => ({
+      title: item.querySelector('title')?.textContent?.trim() ?? '',
+      link: item.querySelector('link')?.textContent?.trim() ?? '',
+      pubDate: item.querySelector('pubDate')?.textContent ?? '',
+      description: item.querySelector('description')?.textContent ?? '',
+    }));
+  }
+
+  // Atom
+  const atomEntries = Array.from(doc.querySelectorAll('entry'));
+  return atomEntries.slice(0, 20).map(item => ({
+    title: item.querySelector('title')?.textContent?.trim() ?? '',
+    link: item.querySelector('link')?.getAttribute('href') ?? '',
+    pubDate: item.querySelector('published, updated')?.textContent ?? '',
+    description: item.querySelector('summary, content')?.textContent ?? '',
+  }));
+}
+
 export default function NewsWidget() {
   const [activeFeedId, setActiveFeedId] = useLocalStorage<string>('news-feed', 'tagesschau');
   const [items, setItems] = useState<NewsItem[]>([]);
@@ -44,17 +69,16 @@ export default function NewsWidget() {
     setLoading(true);
     setError(null);
     try {
-      const encoded = encodeURIComponent(feed.url);
-      const res = await fetch(
-        `https://api.rss2json.com/v1/api.json?rss_url=${encoded}&count=20`,
-        { signal: AbortSignal.timeout(12000) }
-      );
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(feed.url)}`;
+      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
-      if (json.status !== 'ok') throw new Error(json.message ?? 'Feed-Fehler');
-      setItems(json.items ?? []);
-    } catch {
-      setError('Feed nicht verfügbar');
+      if (!json.contents) throw new Error('Kein Inhalt');
+      const parsed = parseRss(json.contents);
+      if (parsed.length === 0) throw new Error('Keine Artikel gefunden');
+      setItems(parsed);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Feed nicht verfügbar');
     } finally {
       setLoading(false);
     }

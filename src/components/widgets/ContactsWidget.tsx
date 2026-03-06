@@ -1,100 +1,334 @@
-import { useState } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { v4 as uuid } from 'uuid';
-import { Users, Plus, Search, Trash2, Mail, Phone, Building, Tag } from 'lucide-react';
+import {
+  Users, Plus, Search, Trash2, Mail, Phone, Building, Tag,
+  Camera, ChevronDown, ChevronRight, X, Check, Scan,
+} from 'lucide-react';
+import Tesseract from 'tesseract.js';
 import WidgetWrapper from '../WidgetWrapper';
 import { useSupabase } from '../../hooks/useSupabase';
 import type { Contact } from '../../types';
+
+const EMPTY_FORM = { name: '', email: '', phone: '', company: '', tags: '', notes: '', avatar: '' };
+
+function compressToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const size = 80;
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d')!;
+      const ratio = Math.max(size / img.width, size / img.height);
+      const w = img.width * ratio;
+      const h = img.height * ratio;
+      ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', 0.75));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+function parseOcrText(text: string): Partial<typeof EMPTY_FORM> {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const result: Partial<typeof EMPTY_FORM> = {};
+
+  const emailRx = /[\w._%+-]+@[\w.-]+\.[a-z]{2,}/i;
+  const phoneRx = /(?:\+?\d[\d\s\-().]{6,})/;
+
+  for (const line of lines) {
+    if (!result.email) {
+      const m = line.match(emailRx);
+      if (m) result.email = m[0];
+    }
+    if (!result.phone) {
+      const m = line.match(phoneRx);
+      // Avoid matching things that look like zip codes or IPs
+      if (m && m[0].replace(/\D/g, '').length >= 7) result.phone = m[0].trim();
+    }
+  }
+
+  // Longest line without digits is probably the name
+  const nameCandidates = lines
+    .filter(l => !emailRx.test(l) && !phoneRx.test(l))
+    .filter(l => l.length > 2 && l.length < 50 && /[a-zA-ZÄÖÜäöüß]/.test(l));
+  if (nameCandidates.length > 0) {
+    result.name = nameCandidates[0];
+  }
+  // Company heuristic: second non-name line, or line with GmbH/AG/Ltd/Inc
+  const companyRx = /GmbH|AG|Ltd|Inc|Corp|Co\.|KG|OHG|e\.V\.|SE/i;
+  const companyLine = lines.find(l => companyRx.test(l));
+  if (companyLine) result.company = companyLine;
+  else if (nameCandidates.length > 1) result.company = nameCandidates[1];
+
+  return result;
+}
+
+function getInitials(name: string) {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+}
+
+function getAvatarColor(name: string) {
+  const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#14b8a6', '#f97316', '#06b6d4'];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
+}
 
 export default function ContactsWidget() {
   const [contacts, setContacts] = useSupabase<Contact>('contacts', []);
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', phone: '', company: '', tags: '', notes: '' });
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [groupByCompany, setGroupByCompany] = useState(true);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const cardInputRef = useRef<HTMLInputElement>(null);
 
-  const handleAdd = () => {
-    if (!form.name) return;
-    const contact: Contact = {
-      id: uuid(),
-      name: form.name,
+  const filtered = useMemo(() => contacts.filter(c =>
+    c.name.toLowerCase().includes(search.toLowerCase()) ||
+    (c.email ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (c.company ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    c.tags.some(t => t.toLowerCase().includes(search.toLowerCase()))
+  ), [contacts, search]);
+
+  const grouped = useMemo(() => {
+    if (!groupByCompany) return null;
+    const map = new Map<string, Contact[]>();
+    for (const c of filtered) {
+      const key = c.company?.trim() || '— Ohne Firma —';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(c);
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => {
+      if (a === '— Ohne Firma —') return 1;
+      if (b === '— Ohne Firma —') return -1;
+      return a.localeCompare(b);
+    });
+  }, [filtered, groupByCompany]);
+
+  const openAdd = () => {
+    setEditId(null);
+    setForm(EMPTY_FORM);
+    setShowForm(true);
+  };
+
+  const openEdit = (c: Contact) => {
+    setEditId(c.id);
+    setForm({
+      name: c.name,
+      email: c.email ?? '',
+      phone: c.phone ?? '',
+      company: c.company ?? '',
+      tags: c.tags.join(', '),
+      notes: c.notes ?? '',
+      avatar: c.avatar ?? '',
+    });
+    setShowForm(true);
+  };
+
+  const handleSave = () => {
+    if (!form.name.trim()) return;
+    const base: Omit<Contact, 'id' | 'createdAt'> = {
+      name: form.name.trim(),
       email: form.email || undefined,
       phone: form.phone || undefined,
       company: form.company || undefined,
-      tags: form.tags ? form.tags.split(',').map(t => t.trim()) : [],
+      tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
       notes: form.notes || undefined,
-      createdAt: Date.now(),
+      avatar: form.avatar || undefined,
     };
-    setContacts(prev => [contact, ...prev]);
-    setForm({ name: '', email: '', phone: '', company: '', tags: '', notes: '' });
+    if (editId) {
+      setContacts(prev => prev.map(c => c.id === editId ? { ...c, ...base } : c));
+    } else {
+      setContacts(prev => [{ id: uuid(), createdAt: Date.now(), ...base }, ...prev]);
+    }
+    setForm(EMPTY_FORM);
     setShowForm(false);
+    setEditId(null);
   };
 
   const handleDelete = (id: string) => {
     setContacts(prev => prev.filter(c => c.id !== id));
+    if (editId === id) { setShowForm(false); setEditId(null); }
   };
 
-  const filtered = contacts.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    (c.email || '').toLowerCase().includes(search.toLowerCase()) ||
-    (c.company || '').toLowerCase().includes(search.toLowerCase()) ||
-    c.tags.some(t => t.toLowerCase().includes(search.toLowerCase()))
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const b64 = await compressToBase64(file);
+      setForm(f => ({ ...f, avatar: b64 }));
+    } catch { /* ignore */ }
+    e.target.value = '';
+  };
+
+  const handleCardScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setOcrLoading(true);
+    setOcrProgress(0);
+    try {
+      const result = await Tesseract.recognize(file, 'deu+eng', {
+        logger: m => { if (m.status === 'recognizing text') setOcrProgress(Math.round(m.progress * 100)); },
+      });
+      const extracted = parseOcrText(result.data.text);
+      setForm(f => ({
+        ...f,
+        name: extracted.name || f.name,
+        email: extracted.email || f.email,
+        phone: extracted.phone || f.phone,
+        company: extracted.company || f.company,
+      }));
+    } catch { /* ignore */ }
+    setOcrLoading(false);
+    e.target.value = '';
+  };
+
+  const toggleGroup = (key: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const renderContact = (c: Contact, hideCompany = false) => (
+    <div key={c.id} className="contact-card">
+      <div className="contact-avatar-wrap" onClick={() => openEdit(c)}>
+        {c.avatar
+          ? <img src={c.avatar} alt={c.name} className="contact-avatar-img" />
+          : <div className="contact-avatar" style={{ background: getAvatarColor(c.name) }}>{getInitials(c.name)}</div>
+        }
+      </div>
+      <div className="contact-info" onClick={() => openEdit(c)}>
+        <strong>{c.name}</strong>
+        {!hideCompany && c.company && <span className="contact-detail"><Building size={11} /> {c.company}</span>}
+        {c.email && <span className="contact-detail"><Mail size={11} /> {c.email}</span>}
+        {c.phone && <span className="contact-detail"><Phone size={11} /> {c.phone}</span>}
+        {c.tags.length > 0 && (
+          <div className="contact-tags">
+            {c.tags.map(tag => <span key={tag} className="tag"><Tag size={10} /> {tag}</span>)}
+          </div>
+        )}
+      </div>
+      <button className="btn-icon-sm delete-btn" onClick={() => handleDelete(c.id)}><Trash2 size={12} /></button>
+    </div>
   );
-
-  const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  };
-
-  const getAvatarColor = (name: string) => {
-    const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#14b8a6', '#f97316', '#06b6d4'];
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    return colors[Math.abs(hash) % colors.length];
-  };
 
   return (
     <WidgetWrapper widgetId="contacts" title="Kontakte" icon={<Users size={16} />}>
-      <div className="vault-toolbar">
-        <div className="search-box">
-          <Search size={14} />
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Suchen..." />
-        </div>
-        <button className="btn-icon" onClick={() => setShowForm(!showForm)}><Plus size={16} /></button>
-      </div>
-
-      {showForm && (
-        <div className="vault-form">
-          <input placeholder="Name *" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-          <input placeholder="E-Mail" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-          <input placeholder="Telefon" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
-          <input placeholder="Firma" value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} />
-          <input placeholder="Tags (kommagetrennt)" value={form.tags} onChange={e => setForm({ ...form, tags: e.target.value })} />
-          <div className="form-actions">
-            <button className="btn-primary" onClick={handleAdd}>Speichern</button>
-            <button className="btn-secondary" onClick={() => setShowForm(false)}>Abbrechen</button>
+      <div className="contacts-widget">
+        <div className="vault-toolbar">
+          <div className="search-box">
+            <Search size={14} />
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Suchen…" />
           </div>
+          <button
+            className={`btn-icon ${groupByCompany ? 'active' : ''}`}
+            onClick={() => setGroupByCompany(v => !v)}
+            title="Nach Firma gruppieren"
+          >
+            <Building size={15} />
+          </button>
+          <button className="btn-icon" onClick={openAdd}><Plus size={16} /></button>
         </div>
-      )}
 
-      <div className="contact-list">
-        {filtered.map(contact => (
-          <div key={contact.id} className="contact-card">
-            <div className="contact-avatar" style={{ background: getAvatarColor(contact.name) }}>
-              {getInitials(contact.name)}
+        {showForm && (
+          <div className="contact-form">
+            <div className="contact-form-header">
+              <span>{editId ? 'Kontakt bearbeiten' : 'Neuer Kontakt'}</span>
+              <button className="btn-icon-sm" onClick={() => setShowForm(false)}><X size={14} /></button>
             </div>
-            <div className="contact-info">
-              <strong>{contact.name}</strong>
-              {contact.email && <span className="contact-detail"><Mail size={11} /> {contact.email}</span>}
-              {contact.phone && <span className="contact-detail"><Phone size={11} /> {contact.phone}</span>}
-              {contact.company && <span className="contact-detail"><Building size={11} /> {contact.company}</span>}
-              {contact.tags.length > 0 && (
-                <div className="contact-tags">
-                  {contact.tags.map(tag => <span key={tag} className="tag"><Tag size={10} /> {tag}</span>)}
-                </div>
-              )}
+
+            {/* Avatar preview + upload */}
+            <div className="contact-form-avatar">
+              <div
+                className="contact-form-avatar-preview"
+                onClick={() => photoInputRef.current?.click()}
+                title="Foto auswählen"
+              >
+                {form.avatar
+                  ? <img src={form.avatar} alt="Avatar" />
+                  : <div className="contact-avatar-placeholder"><Camera size={20} /></div>
+                }
+              </div>
+              <div className="contact-form-avatar-actions">
+                <button className="btn-secondary btn-sm" onClick={() => photoInputRef.current?.click()}>
+                  <Camera size={13} /> Foto
+                </button>
+                <button
+                  className="btn-secondary btn-sm"
+                  onClick={() => cardInputRef.current?.click()}
+                  disabled={ocrLoading}
+                >
+                  <Scan size={13} />
+                  {ocrLoading ? `OCR ${ocrProgress}%` : 'Visitenkarte'}
+                </button>
+                {form.avatar && (
+                  <button className="btn-secondary btn-sm" onClick={() => setForm(f => ({ ...f, avatar: '' }))}>
+                    <X size={13} /> Foto entfernen
+                  </button>
+                )}
+              </div>
             </div>
-            <button className="btn-icon-sm delete-btn" onClick={() => handleDelete(contact.id)}><Trash2 size={12} /></button>
+            <input type="file" ref={photoInputRef} accept="image/*" style={{ display: 'none' }} onChange={handlePhotoUpload} />
+            <input type="file" ref={cardInputRef} accept="image/*" style={{ display: 'none' }} onChange={handleCardScan} />
+
+            <div className="vault-form">
+              <input placeholder="Name *" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+              <input placeholder="Firma" value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} />
+              <input placeholder="E-Mail" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+              <input placeholder="Telefon" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+              <input placeholder="Tags (kommagetrennt)" value={form.tags} onChange={e => setForm({ ...form, tags: e.target.value })} />
+              <input placeholder="Notizen" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+              <div className="form-actions">
+                <button className="btn-primary" onClick={handleSave}><Check size={14} /> Speichern</button>
+                <button className="btn-secondary" onClick={() => setShowForm(false)}>Abbrechen</button>
+                {editId && (
+                  <button className="btn-danger btn-sm" onClick={() => handleDelete(editId)}>
+                    <Trash2 size={13} /> Löschen
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
-        ))}
-        {filtered.length === 0 && <p className="empty-text">{search ? 'Keine Treffer' : 'Noch keine Kontakte'}</p>}
+        )}
+
+        <div className="contact-list">
+          {grouped ? (
+            grouped.map(([company, members]) => (
+              <div key={company} className="contact-group">
+                <button className="contact-group-header" onClick={() => toggleGroup(company)}>
+                  {collapsedGroups.has(company)
+                    ? <ChevronRight size={14} />
+                    : <ChevronDown size={14} />
+                  }
+                  <Building size={13} className="contact-group-icon" />
+                  <span className="contact-group-name">{company}</span>
+                  <span className="contact-group-count">{members.length}</span>
+                </button>
+                {!collapsedGroups.has(company) && (
+                  <div className="contact-group-members">
+                    {members.map(c => renderContact(c, true))}
+                  </div>
+                )}
+              </div>
+            ))
+          ) : (
+            filtered.map(c => renderContact(c))
+          )}
+          {filtered.length === 0 && (
+            <p className="empty-text">{search ? 'Keine Treffer' : 'Noch keine Kontakte'}</p>
+          )}
+        </div>
       </div>
     </WidgetWrapper>
   );
