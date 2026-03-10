@@ -553,7 +553,7 @@ export default function ContactsWidget() {
         <div className="vault-toolbar">
           <div className="search-box">
             <Search size={14} />
-            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Name, E-Mail, Tag…" autoComplete="nope" name="contacts-search" />
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Name, E-Mail, Tag…" autoComplete="off" readOnly onFocus={e => e.currentTarget.removeAttribute("readOnly")} name="contacts-search" />
             {search && (
               <button className="search-clear" onClick={() => setSearch('')} aria-label="Suche löschen">
                 <X size={12} />
