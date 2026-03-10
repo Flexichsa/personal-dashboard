@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { v4 as uuid } from 'uuid';
-import { Lock, Plus, Eye, EyeOff, Copy, Trash2, Key, Search, RefreshCw } from 'lucide-react';
+import { Lock, Plus, Eye, EyeOff, Copy, Trash2, Key, Search, RefreshCw, Pencil } from 'lucide-react';
 import WidgetWrapper from '../WidgetWrapper';
 import { useSupabaseVault } from '../../hooks/useSupabaseVault';
 import { encrypt, decrypt, hashPassword, generatePassword } from '../../utils/encryption';
@@ -17,6 +17,7 @@ export default function PasswordVault() {
   const [masterKey, setMasterKey] = useState('');
   const [error, setError] = useState('');
 
+  const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ title: '', username: '', password: '', url: '', category: '', notes: '' });
 
   const saveEntries = (newEntries: PasswordEntry[], key: string) => {
@@ -57,16 +58,20 @@ export default function PasswordVault() {
     }
   };
 
-  const handleAdd = () => {
+  const openEdit = (entry: PasswordEntry) => {
+    setEditId(entry.id);
+    setForm({ title: entry.title, username: entry.username, password: entry.password, url: entry.url || '', category: entry.category || '', notes: entry.notes || '' });
+    setShowForm(true);
+  };
+
+  const handleSave = () => {
     if (!form.title || !form.password) return;
-    const entry: PasswordEntry = {
-      id: uuid(),
-      ...form,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-    const newEntries = [entry, ...entries];
-    saveEntries(newEntries, masterKey);
+    if (editId) {
+      saveEntries(entries.map(e => e.id === editId ? { ...e, ...form, updatedAt: Date.now() } : e), masterKey);
+      setEditId(null);
+    } else {
+      saveEntries([{ id: uuid(), ...form, createdAt: Date.now(), updatedAt: Date.now() }, ...entries], masterKey);
+    }
     setForm({ title: '', username: '', password: '', url: '', category: '', notes: '' });
     setShowForm(false);
   };
@@ -175,8 +180,8 @@ export default function PasswordVault() {
           <input placeholder="URL" value={form.url} onChange={e => setForm({ ...form, url: e.target.value })} />
           <input placeholder="Kategorie" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} />
           <div className="form-actions">
-            <button className="btn-primary" onClick={handleAdd}>Speichern</button>
-            <button className="btn-secondary" onClick={() => setShowForm(false)}>Abbrechen</button>
+            <button className="btn-primary" onClick={handleSave}>{editId ? 'Aktualisieren' : 'Speichern'}</button>
+            <button className="btn-secondary" onClick={() => { setShowForm(false); setEditId(null); setForm({ title: '', username: '', password: '', url: '', category: '', notes: '' }); }}>Abbrechen</button>
           </div>
         </div>
       )}
@@ -202,7 +207,10 @@ export default function PasswordVault() {
               </button>
               <button className="btn-icon-sm" onClick={() => copyToClipboard(entry.password)} title="Kopieren"><Copy size={12} /></button>
             </div>
-            <button className="btn-icon-sm delete-btn" onClick={() => handleDelete(entry.id)}><Trash2 size={12} /></button>
+            <div className="vault-entry-actions">
+              <button className="btn-icon-sm" onClick={() => openEdit(entry)} title="Bearbeiten"><Pencil size={12} /></button>
+              <button className="btn-icon-sm delete-btn" onClick={() => handleDelete(entry.id)} title="Löschen"><Trash2 size={12} /></button>
+            </div>
           </div>
         ))}
         {filtered.length === 0 && <p className="empty-text">{search ? 'Keine Treffer' : 'Noch keine Einträge'}</p>}

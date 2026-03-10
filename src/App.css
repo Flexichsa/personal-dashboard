@@ -724,11 +724,17 @@
   flex: 1;
 }
 
-.vault-entry .delete-btn {
+.vault-entry-actions {
   position: absolute;
   top: 8px;
   right: 8px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
 }
+.vault-entry:hover .vault-entry-actions { opacity: 1; }
+@media (hover: none) { .vault-entry-actions { opacity: 0.7; } }
 
 /* ===== CONTACTS ===== */
 .contact-list {
