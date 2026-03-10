@@ -133,6 +133,25 @@ function getAvatarColor(name: string) {
   return colors[Math.abs(hash) % colors.length];
 }
 
+function normalizePhone(raw: string): string {
+  if (!raw.trim()) return raw;
+  let s = raw.replace(/[\s\-\/\(\)\.]/g, '');
+  if (/^00\d/.test(s)) {
+    s = '+' + s.slice(2);
+  } else if (/^0[^0+]/.test(s)) {
+    s = '+41' + s.slice(1);
+  }
+  if (!s.startsWith('+')) return raw.trim();
+  const ch = s.match(/^\+41(\d{9})$/);
+  if (ch) {
+    const n = ch[1];
+    return `+41 ${n.slice(0, 2)} ${n.slice(2, 5)} ${n.slice(5, 7)} ${n.slice(7, 9)}`;
+  }
+  const de = s.match(/^\+49(\d+)$/);
+  if (de) return `+49 ${de[1]}`;
+  return s;
+}
+
 const EMPTY_CONTACT = { name: '', email: '', phone: '', companyId: '', position: '', tags: '', notes: '', avatar: '' };
 const EMPTY_COMPANY = { name: '', logo: '', phone: '', email: '', website: '', address: '', notes: '' };
 
@@ -267,7 +286,7 @@ export default function ContactsWidget() {
     const base: Omit<Contact, 'id' | 'createdAt'> = {
       name: contactForm.name.trim(),
       email: contactForm.email || undefined,
-      phone: contactForm.phone || undefined,
+      phone: normalizePhone(contactForm.phone) || undefined,
       companyId: contactForm.companyId || undefined,
       position: contactForm.position || undefined,
       tags: contactForm.tags ? contactForm.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
@@ -700,7 +719,7 @@ export default function ContactsWidget() {
                 <span className="form-group-label">Kontaktdaten</span>
                 <div className="form-group-row">
                   <input placeholder="E-Mail" type="email" value={contactForm.email} onChange={e => setContactForm({ ...contactForm, email: e.target.value })} autoComplete="off" />
-                  <input placeholder="Telefon" type="tel" value={contactForm.phone} onChange={e => setContactForm({ ...contactForm, phone: e.target.value })} autoComplete="off" />
+                  <input placeholder="Telefon" type="tel" value={contactForm.phone} onChange={e => setContactForm({ ...contactForm, phone: e.target.value })} onBlur={e => setContactForm(f => ({ ...f, phone: normalizePhone(e.target.value) }))} autoComplete="off" />
                 </div>
               </div>
               <div className="form-divider" />
