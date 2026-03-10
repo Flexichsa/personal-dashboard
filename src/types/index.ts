@@ -32,6 +32,7 @@ export interface Contact {
   phone?: string;
   company?: string;     // legacy string (für Abwärtskompatibilität)
   companyId?: string;   // Referenz auf Company.id
+  position?: string;    // Stelle/Jobtitel in der Firma
   tags: string[];
   avatar?: string;
   notes?: string;

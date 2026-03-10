@@ -133,7 +133,7 @@ function getAvatarColor(name: string) {
   return colors[Math.abs(hash) % colors.length];
 }
 
-const EMPTY_CONTACT = { name: '', email: '', phone: '', companyId: '', tags: '', notes: '', avatar: '' };
+const EMPTY_CONTACT = { name: '', email: '', phone: '', companyId: '', position: '', tags: '', notes: '', avatar: '' };
 const EMPTY_COMPANY = { name: '', logo: '', phone: '', email: '', website: '', address: '', notes: '' };
 
 export default function ContactsWidget() {
@@ -228,8 +228,8 @@ export default function ContactsWidget() {
     setEditContactId(c.id);
     setContactForm({
       name: c.name, email: c.email ?? '', phone: c.phone ?? '',
-      companyId: c.companyId ?? '', tags: c.tags.join(', '),
-      notes: c.notes ?? '', avatar: c.avatar ?? '',
+      companyId: c.companyId ?? '', position: c.position ?? '',
+      tags: c.tags.join(', '), notes: c.notes ?? '', avatar: c.avatar ?? '',
     });
     setOcrLines([]); setScanError(null);
     resetSmartFill();
@@ -262,6 +262,7 @@ export default function ContactsWidget() {
       email: contactForm.email || undefined,
       phone: contactForm.phone || undefined,
       companyId: contactForm.companyId || undefined,
+      position: contactForm.position || undefined,
       tags: contactForm.tags ? contactForm.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
       notes: contactForm.notes || undefined,
       avatar: contactForm.avatar || undefined,
@@ -487,6 +488,7 @@ export default function ContactsWidget() {
         </div>
         <div className="contact-info" onClick={() => openEditContact(c)}>
           <strong>{c.name}</strong>
+          {c.position && <span className="contact-position">{c.position}</span>}
           {!hideCompany && c.companyId && (
             <span className="contact-detail"><Building size={11} /> {companies.find(co => co.id === c.companyId)?.name ?? ''}</span>
           )}
@@ -674,6 +676,7 @@ export default function ContactsWidget() {
                 <option value="">— Ohne Firma —</option>
                 {sortedCompanyList.map(co => <option key={co.id} value={co.id}>{co.name}</option>)}
               </select>
+              <input placeholder="Position / Stelle (z.B. CEO, Vertrieb…)" value={contactForm.position} onChange={e => setContactForm({ ...contactForm, position: e.target.value })} />
               <input placeholder="E-Mail" value={contactForm.email} onChange={e => setContactForm({ ...contactForm, email: e.target.value })} />
               <input placeholder="Telefon" value={contactForm.phone} onChange={e => setContactForm({ ...contactForm, phone: e.target.value })} />
               <input placeholder="Tags (kommagetrennt)" value={contactForm.tags} onChange={e => setContactForm({ ...contactForm, tags: e.target.value })} />

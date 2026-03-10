@@ -695,6 +695,14 @@
   margin-bottom: 2px;
 }
 
+.contact-position {
+  display: block;
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 500;
+  margin-bottom: 1px;
+}
+
 .contact-detail {
   display: flex;
   align-items: center;
