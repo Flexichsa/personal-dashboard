@@ -769,6 +769,7 @@ export default function ContactsWidget() {
                     <button className="btn-icon-sm" onClick={() => openEditCompany(co)} title="Bearbeiten"><Pencil size={13} /></button>
                     {isConfirmDelete ? (
                       <div className="contact-confirm-delete">
+                        <span>Firma löschen?</span>
                         <button className="btn-confirm-yes" onClick={() => deleteCompany(co.id)}>Ja</button>
                         <button className="btn-confirm-no" onClick={() => setConfirmDeleteCompany(null)}>Nein</button>
                       </div>
