@@ -509,13 +509,13 @@ export default function ContactsWidget() {
     const isConfirmDelete = confirmDeleteContact === c.id;
     return (
       <div key={c.id} className="contact-card">
-        <div className="contact-avatar-wrap" onClick={() => openEditContact(c)}>
+        <div className="contact-avatar-wrap">
           {c.avatar
             ? <img src={c.avatar} alt={c.name} className="contact-avatar-img" />
             : <div className="contact-avatar" style={{ background: getAvatarColor(c.name) }}>{getInitials(c.name)}</div>
           }
         </div>
-        <div className="contact-info" onClick={() => openEditContact(c)}>
+        <div className="contact-info">
           <strong>{c.name}</strong>
           {c.position && <span className="contact-position">{c.position}</span>}
           {!hideCompany && c.companyId && (
@@ -539,7 +539,10 @@ export default function ContactsWidget() {
             <button className="btn-confirm-no" onClick={() => setConfirmDeleteContact(null)}>Nein</button>
           </div>
         ) : (
-          <button className="btn-icon-sm delete-btn" onClick={() => setConfirmDeleteContact(c.id)}><Trash2 size={12} /></button>
+          <div className="contact-actions">
+            <button className="btn-icon-sm" onClick={() => openEditContact(c)} title="Bearbeiten"><Pencil size={12} /></button>
+            <button className="btn-icon-sm delete-btn" onClick={() => setConfirmDeleteContact(c.id)} title="Löschen"><Trash2 size={12} /></button>
+          </div>
         )}
       </div>
     );

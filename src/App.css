@@ -889,16 +889,18 @@
   line-height: 1.4;
 }
 
-/* Delete button: reveal on hover */
-.contact-card .delete-btn {
+/* Contact action buttons (edit + delete): reveal on hover */
+.contact-card .contact-actions {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 2px;
   opacity: 0;
   transition: opacity 0.15s;
 }
-.contact-card:hover .delete-btn { opacity: 1; }
-@media (hover: none) { .contact-card .delete-btn { opacity: 0.5; } }
+.contact-card:hover .contact-actions { opacity: 1; }
+@media (hover: none) { .contact-card .contact-actions { opacity: 0.7; } }
 
 /* Contact avatar image */
 .contact-avatar-wrap {
