@@ -16,6 +16,7 @@ export interface ContactExtract {
   email?: string;
   phone?: string;
   company?: string;
+  position?: string;
 }
 
 export interface CompanyExtract {
@@ -66,7 +67,7 @@ export async function extractContactFromText(
   text: string,
   apiKey: string,
 ): Promise<ContactExtract> {
-  const prompt = `Extrahiere Kontaktdaten aus diesem Text. Antworte NUR mit einem JSON-Objekt mit diesen optionalen Feldern: name, email, phone, company. Nur Felder die eindeutig vorhanden sind.
+  const prompt = `Extrahiere Kontaktdaten aus diesem Text. Antworte NUR mit einem JSON-Objekt mit diesen optionalen Feldern: name, email, phone, company, position (Berufsbezeichnung/Rolle). Nur Felder die eindeutig vorhanden sind.
 
 Text:
 ${text}
@@ -90,7 +91,7 @@ export async function extractContactFromImage(
     },
     {
       type: 'text',
-      text: 'Extrahiere Kontaktdaten aus diesem Bild (Visitenkarte, E-Mail-Signatur, etc.). Antworte NUR mit einem JSON-Objekt mit diesen optionalen Feldern: name, email, phone, company. Nur Felder die eindeutig sichtbar sind. Nur JSON zurückgeben.',
+      text: 'Extrahiere Kontaktdaten aus diesem Bild (Visitenkarte, E-Mail-Signatur, etc.). Antworte NUR mit einem JSON-Objekt mit diesen optionalen Feldern: name, email, phone, company, position (Berufsbezeichnung/Rolle). Nur Felder die eindeutig sichtbar sind. Nur JSON zurückgeben.',
     },
   ];
 

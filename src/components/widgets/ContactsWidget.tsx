@@ -390,6 +390,7 @@ export default function ContactsWidget() {
           name: result.name || f.name,
           email: result.email || f.email,
           phone: result.phone || f.phone,
+          position: result.position || f.position,
           // Firma per Name suchen und companyId setzen
           companyId: result.company
             ? (sortedCompanyList.find(co => co.name.toLowerCase() === result.company!.toLowerCase())?.id ?? f.companyId)
