@@ -11,13 +11,26 @@ export interface PasswordEntry {
   updatedAt: number;
 }
 
+// Company types
+export interface Company {
+  id: string;
+  name: string;
+  logo?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  notes?: string;
+  createdAt: number;
+}
+
 // Contact types
 export interface Contact {
   id: string;
   name: string;
   email?: string;
   phone?: string;
-  company?: string;
+  company?: string;     // legacy string (für Abwärtskompatibilität)
+  companyId?: string;   // Referenz auf Company.id
   tags: string[];
   avatar?: string;
   notes?: string;

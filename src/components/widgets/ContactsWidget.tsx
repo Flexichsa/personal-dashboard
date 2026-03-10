@@ -2,23 +2,21 @@ import { useState, useMemo, useRef } from 'react';
 import { v4 as uuid } from 'uuid';
 import {
   Users, Plus, Search, Trash2, Mail, Phone, Building, Tag,
-  Camera, ChevronDown, ChevronRight, X, Check, Scan,
+  Camera, ChevronDown, ChevronRight, X, Check, Scan, Globe, Pencil, Image as ImageIcon,
 } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import jsQR from 'jsqr';
 import WidgetWrapper from '../WidgetWrapper';
 import { useSupabase } from '../../hooks/useSupabase';
-import type { Contact } from '../../types';
+import type { Contact, Company } from '../../types';
 
-const EMPTY_FORM = { name: '', email: '', phone: '', company: '', tags: '', notes: '', avatar: '' };
-
-function compressToBase64(file: File): Promise<string> {
+// --- Image helpers ---
+function compressToBase64(file: File, size = 80): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      const size = 80;
       canvas.width = size;
       canvas.height = size;
       const ctx = canvas.getContext('2d')!;
@@ -41,8 +39,8 @@ function extractOcrLines(text: string): string[] {
     .filter(l => {
       if (l.length < 4) return false;
       const letters = (l.match(/[a-zA-ZÄÖÜäöüß]/g) ?? []).length;
-      if (letters < 2) return false;           // mostly symbols/numbers = noise
-      if (letters / l.length < 0.35) return false; // too few letters relative to length
+      if (letters < 2) return false;
+      if (letters / l.length < 0.35) return false;
       return true;
     });
 }
@@ -55,7 +53,6 @@ function isHeic(file: File): boolean {
   );
 }
 
-// Decode QR code from an image file → returns raw QR string or null
 function decodeQrFromFile(file: File): Promise<string | null> {
   return new Promise(resolve => {
     const img = new Image();
@@ -76,11 +73,9 @@ function decodeQrFromFile(file: File): Promise<string | null> {
   });
 }
 
-// Parse vCard or MeCard QR content into form fields
-function parseVCard(text: string): Partial<typeof EMPTY_FORM> | null {
-  const result: Partial<typeof EMPTY_FORM> = {};
+function parseVCard(text: string): Partial<{ name: string; email: string; phone: string }> | null {
+  const result: Partial<{ name: string; email: string; phone: string }> = {};
 
-  // MeCard: MECARD:N:Last,First;TEL:...;EMAIL:...;ORG:...;;
   if (text.startsWith('MECARD:')) {
     const inner = text.replace(/^MECARD:/, '');
     inner.split(';').forEach(part => {
@@ -90,19 +85,14 @@ function parseVCard(text: string): Partial<typeof EMPTY_FORM> | null {
       const val = part.slice(idx + 1).trim();
       if (!val) return;
       switch (key) {
-        case 'N':
-          // N:Last,First → "First Last"
-          result.name = val.split(',').reverse().join(' ').trim();
-          break;
+        case 'N': result.name = val.split(',').reverse().join(' ').trim(); break;
         case 'TEL': if (!result.phone) result.phone = val; break;
         case 'EMAIL': if (!result.email) result.email = val.toLowerCase(); break;
-        case 'ORG': if (!result.company) result.company = val; break;
       }
     });
     return Object.keys(result).length > 0 ? result : null;
   }
 
-  // vCard 2.1 / 3.0 / 4.0
   if (text.includes('BEGIN:VCARD')) {
     text.split(/[\r\n]+/).forEach(line => {
       const idx = line.indexOf(':');
@@ -113,7 +103,6 @@ function parseVCard(text: string): Partial<typeof EMPTY_FORM> | null {
       switch (rawKey) {
         case 'FN': if (!result.name) result.name = val; break;
         case 'N':
-          // N:Last;First;Middle;Prefix;Suffix
           if (!result.name) {
             const parts = val.split(';');
             result.name = [parts[1], parts[0]].filter(Boolean).join(' ').trim();
@@ -121,7 +110,6 @@ function parseVCard(text: string): Partial<typeof EMPTY_FORM> | null {
           break;
         case 'EMAIL': if (!result.email) result.email = val.toLowerCase(); break;
         case 'TEL': if (!result.phone) result.phone = val; break;
-        case 'ORG': if (!result.company) result.company = val.split(';')[0]; break;
       }
     });
     return Object.keys(result).length > 0 ? result : null;
@@ -141,99 +129,204 @@ function getAvatarColor(name: string) {
   return colors[Math.abs(hash) % colors.length];
 }
 
+const EMPTY_CONTACT = { name: '', email: '', phone: '', companyId: '', tags: '', notes: '', avatar: '' };
+const EMPTY_COMPANY = { name: '', logo: '', phone: '', email: '', website: '', notes: '' };
+
 export default function ContactsWidget() {
   const [contacts, setContacts] = useSupabase<Contact>('contacts', []);
+  const [companies, setCompanies] = useSupabase<Company>('companies', []);
+
+  type FormMode = 'none' | 'contact' | 'company';
+  const [formMode, setFormMode] = useState<FormMode>('none');
+  const [contactForm, setContactForm] = useState(EMPTY_CONTACT);
+  const [companyForm, setCompanyForm] = useState(EMPTY_COMPANY);
+  const [editContactId, setEditContactId] = useState<string | null>(null);
+  const [editCompanyId, setEditCompanyId] = useState<string | null>(null);
+
   const [search, setSearch] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [groupByCompany, setGroupByCompany] = useState(true);
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [confirmDeleteContact, setConfirmDeleteContact] = useState<string | null>(null);
+  const [confirmDeleteCompany, setConfirmDeleteCompany] = useState<string | null>(null);
+
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   const [ocrLines, setOcrLines] = useState<string[]>([]);
   const [scanError, setScanError] = useState<string | null>(null);
-  const photoInputRef = useRef<HTMLInputElement>(null);
-  const cardInputRef = useRef<HTMLInputElement>(null);
 
-  const filtered = useMemo(() => contacts.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    (c.email ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    (c.company ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    c.tags.some(t => t.toLowerCase().includes(search.toLowerCase()))
-  ), [contacts, search]);
+  const photoRef = useRef<HTMLInputElement>(null);
+  const cardRef = useRef<HTMLInputElement>(null);
+  const logoRef = useRef<HTMLInputElement>(null);
 
-  const grouped = useMemo(() => {
-    if (!groupByCompany) return null;
+  // --- Filtered & grouped data ---
+  const q = search.toLowerCase();
+
+  const filteredContacts = useMemo(() => {
+    if (!q) return contacts;
+    return contacts.filter(c =>
+      c.name.toLowerCase().includes(q) ||
+      (c.email ?? '').toLowerCase().includes(q) ||
+      (c.phone ?? '').includes(q) ||
+      (c.company ?? '').toLowerCase().includes(q) ||
+      c.tags.some(t => t.toLowerCase().includes(q))
+    );
+  }, [contacts, q]);
+
+  const filteredCompanies = useMemo(() => {
+    if (!q) return companies;
+    const companyIdsWithMatches = new Set(
+      filteredContacts.filter(c => c.companyId).map(c => c.companyId!)
+    );
+    return companies.filter(co =>
+      co.name.toLowerCase().includes(q) ||
+      companyIdsWithMatches.has(co.id)
+    );
+  }, [companies, filteredContacts, q]);
+
+  const contactsByCompany = useMemo(() => {
     const map = new Map<string, Contact[]>();
-    for (const c of filtered) {
-      const key = c.company?.trim() || '— Ohne Firma —';
+    for (const c of filteredContacts) {
+      const key = c.companyId ?? '';
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(c);
     }
-    return Array.from(map.entries()).sort(([a], [b]) => {
-      if (a === '— Ohne Firma —') return 1;
-      if (b === '— Ohne Firma —') return -1;
-      return a.localeCompare(b);
-    });
-  }, [filtered, groupByCompany]);
+    return map;
+  }, [filteredContacts]);
 
-  const openAdd = () => {
-    setEditId(null);
-    setForm(EMPTY_FORM);
-    setShowForm(true);
+  const unlinkedContacts = contactsByCompany.get('') ?? [];
+
+  const sortedCompanies = useMemo(() =>
+    [...filteredCompanies].sort((a, b) => a.name.localeCompare(b.name)),
+    [filteredCompanies]
+  );
+
+  const sortedCompanyList = useMemo(() =>
+    [...companies].sort((a, b) => a.name.localeCompare(b.name)),
+    [companies]
+  );
+
+  // --- Form openers ---
+  const openNewContact = (preCompanyId = '') => {
+    setEditContactId(null);
+    setContactForm({ ...EMPTY_CONTACT, companyId: preCompanyId });
+    setOcrLines([]);
+    setScanError(null);
+    setFormMode('contact');
   };
 
-  const openEdit = (c: Contact) => {
-    setEditId(c.id);
-    setForm({
+  const openEditContact = (c: Contact) => {
+    setEditContactId(c.id);
+    setContactForm({
       name: c.name,
       email: c.email ?? '',
       phone: c.phone ?? '',
-      company: c.company ?? '',
+      companyId: c.companyId ?? '',
       tags: c.tags.join(', '),
       notes: c.notes ?? '',
       avatar: c.avatar ?? '',
     });
-    setShowForm(true);
+    setOcrLines([]);
+    setScanError(null);
+    setFormMode('contact');
   };
 
-  const handleSave = () => {
-    if (!form.name.trim()) return;
+  const openNewCompany = () => {
+    setEditCompanyId(null);
+    setCompanyForm(EMPTY_COMPANY);
+    setFormMode('company');
+  };
+
+  const openEditCompany = (co: Company) => {
+    setEditCompanyId(co.id);
+    setCompanyForm({
+      name: co.name,
+      logo: co.logo ?? '',
+      phone: co.phone ?? '',
+      email: co.email ?? '',
+      website: co.website ?? '',
+      notes: co.notes ?? '',
+    });
+    setFormMode('company');
+  };
+
+  // --- Save handlers ---
+  const saveContact = () => {
+    if (!contactForm.name.trim()) return;
     const base: Omit<Contact, 'id' | 'createdAt'> = {
-      name: form.name.trim(),
-      email: form.email || undefined,
-      phone: form.phone || undefined,
-      company: form.company || undefined,
-      tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
-      notes: form.notes || undefined,
-      avatar: form.avatar || undefined,
+      name: contactForm.name.trim(),
+      email: contactForm.email || undefined,
+      phone: contactForm.phone || undefined,
+      companyId: contactForm.companyId || undefined,
+      tags: contactForm.tags ? contactForm.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+      notes: contactForm.notes || undefined,
+      avatar: contactForm.avatar || undefined,
     };
-    if (editId) {
-      setContacts(prev => prev.map(c => c.id === editId ? { ...c, ...base } : c));
+    if (editContactId) {
+      setContacts(prev => prev.map(c => c.id === editContactId ? { ...c, ...base } : c));
     } else {
       setContacts(prev => [{ id: uuid(), createdAt: Date.now(), ...base }, ...prev]);
     }
-    setForm(EMPTY_FORM);
-    setShowForm(false);
-    setEditId(null);
+    setFormMode('none');
+    setEditContactId(null);
   };
 
-  const confirmDelete = (id: string) => setConfirmDeleteId(id);
+  const saveCompany = () => {
+    if (!companyForm.name.trim()) return;
+    const base: Omit<Company, 'id' | 'createdAt'> = {
+      name: companyForm.name.trim(),
+      logo: companyForm.logo || undefined,
+      phone: companyForm.phone || undefined,
+      email: companyForm.email || undefined,
+      website: companyForm.website || undefined,
+      notes: companyForm.notes || undefined,
+    };
+    if (editCompanyId) {
+      setCompanies(prev => prev.map(co => co.id === editCompanyId ? { ...co, ...base } : co));
+    } else {
+      setCompanies(prev => [{ id: uuid(), createdAt: Date.now(), ...base }, ...prev]);
+    }
+    setFormMode('none');
+    setEditCompanyId(null);
+  };
 
-  const handleDelete = (id: string) => {
+  const deleteContact = (id: string) => {
     setContacts(prev => prev.filter(c => c.id !== id));
-    setConfirmDeleteId(null);
-    if (editId === id) { setShowForm(false); setEditId(null); }
+    setConfirmDeleteContact(null);
+    if (editContactId === id) { setFormMode('none'); setEditContactId(null); }
   };
 
+  const deleteCompany = (id: string) => {
+    // Verknüpfung aller zugehörigen Kontakte aufheben
+    setContacts(prev => prev.map(c => c.companyId === id ? { ...c, companyId: undefined } : c));
+    setCompanies(prev => prev.filter(co => co.id !== id));
+    setConfirmDeleteCompany(null);
+    if (editCompanyId === id) { setFormMode('none'); setEditCompanyId(null); }
+  };
+
+  const toggleCollapse = (id: string) => {
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  // --- File uploads ---
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const b64 = await compressToBase64(file);
-      setForm(f => ({ ...f, avatar: b64 }));
+      const b64 = await compressToBase64(file, 80);
+      setContactForm(f => ({ ...f, avatar: b64 }));
+    } catch { /* ignore */ }
+    e.target.value = '';
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const b64 = await compressToBase64(file, 100);
+      setCompanyForm(f => ({ ...f, logo: b64 }));
     } catch { /* ignore */ }
     e.target.value = '';
   };
@@ -245,7 +338,7 @@ export default function ContactsWidget() {
     setOcrLines([]);
 
     if (isHeic(file)) {
-      setScanError('HEIC-Format nicht unterstützt. iPhone: Einstellungen → Kamera → Format → „Maximale Kompatibilität" (JPEG). Dann erneut scannen.');
+      setScanError('HEIC-Format nicht unterstützt. iPhone: Einstellungen → Kamera → Format → „Maximale Kompatibilität". Dann erneut scannen.');
       e.target.value = '';
       return;
     }
@@ -253,24 +346,21 @@ export default function ContactsWidget() {
     setOcrLoading(true);
     setOcrProgress(0);
     try {
-      // 1. Try QR code first — gives perfectly structured data
       const qrData = await decodeQrFromFile(file);
       if (qrData) {
         const parsed = parseVCard(qrData);
         if (parsed) {
-          setForm(f => ({
+          setContactForm(f => ({
             ...f,
             name: parsed.name || f.name,
             email: parsed.email || f.email,
             phone: parsed.phone || f.phone,
-            company: parsed.company || f.company,
           }));
           setOcrLoading(false);
           e.target.value = '';
-          return; // done — no OCR needed
+          return;
         }
       }
-      // 2. No QR or unrecognized format → OCR with line picker
       const result = await Tesseract.recognize(file, 'deu+eng', {
         logger: m => { if (m.status === 'recognizing text') setOcrProgress(Math.round(m.progress * 100)); },
       });
@@ -280,107 +370,182 @@ export default function ContactsWidget() {
     e.target.value = '';
   };
 
-  const assignOcrLine = (line: string, field: 'name' | 'company' | 'email' | 'phone') => {
-    setForm(f => ({ ...f, [field]: line }));
-  };
-
-  const toggleGroup = (key: string) => {
-    setCollapsedGroups(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
-  };
-
-  const renderContact = (c: Contact, hideCompany = false) => (
-    <div key={c.id} className="contact-card">
-      <div className="contact-avatar-wrap" onClick={() => openEdit(c)}>
-        {c.avatar
-          ? <img src={c.avatar} alt={c.name} className="contact-avatar-img" />
-          : <div className="contact-avatar" style={{ background: getAvatarColor(c.name) }}>{getInitials(c.name)}</div>
-        }
-      </div>
-      <div className="contact-info" onClick={() => openEdit(c)}>
-        <strong>{c.name}</strong>
-        {!hideCompany && c.company && <span className="contact-detail"><Building size={11} /> {c.company}</span>}
-        {c.email && <span className="contact-detail"><Mail size={11} /> {c.email}</span>}
-        {c.phone && <span className="contact-detail"><Phone size={11} /> {c.phone}</span>}
-        {c.tags.length > 0 && (
-          <div className="contact-tags">
-            {c.tags.map(tag => <span key={tag} className="tag"><Tag size={10} /> {tag}</span>)}
+  // --- Render helpers ---
+  const renderContactCard = (c: Contact, hideCompany = true) => {
+    const isConfirmDelete = confirmDeleteContact === c.id;
+    return (
+      <div key={c.id} className="contact-card">
+        <div className="contact-avatar-wrap" onClick={() => openEditContact(c)}>
+          {c.avatar
+            ? <img src={c.avatar} alt={c.name} className="contact-avatar-img" />
+            : <div className="contact-avatar" style={{ background: getAvatarColor(c.name) }}>{getInitials(c.name)}</div>
+          }
+        </div>
+        <div className="contact-info" onClick={() => openEditContact(c)}>
+          <strong>{c.name}</strong>
+          {!hideCompany && c.companyId && (
+            <span className="contact-detail">
+              <Building size={11} /> {companies.find(co => co.id === c.companyId)?.name ?? ''}
+            </span>
+          )}
+          {!hideCompany && !c.companyId && c.company && (
+            <span className="contact-detail"><Building size={11} /> {c.company}</span>
+          )}
+          {c.email && <span className="contact-detail"><Mail size={11} /> {c.email}</span>}
+          {c.phone && <span className="contact-detail"><Phone size={11} /> {c.phone}</span>}
+          {c.tags.length > 0 && (
+            <div className="contact-tags">
+              {c.tags.map(tag => <span key={tag} className="tag"><Tag size={10} /> {tag}</span>)}
+            </div>
+          )}
+        </div>
+        {isConfirmDelete ? (
+          <div className="contact-confirm-delete">
+            <span>Löschen?</span>
+            <button className="btn-confirm-yes" onClick={() => deleteContact(c.id)}>Ja</button>
+            <button className="btn-confirm-no" onClick={() => setConfirmDeleteContact(null)}>Nein</button>
           </div>
+        ) : (
+          <button className="btn-icon-sm delete-btn" onClick={() => setConfirmDeleteContact(c.id)}><Trash2 size={12} /></button>
         )}
       </div>
-      {confirmDeleteId === c.id ? (
-        <div className="contact-confirm-delete">
-          <span>Löschen?</span>
-          <button className="btn-confirm-yes" onClick={() => handleDelete(c.id)}>Ja</button>
-          <button className="btn-confirm-no" onClick={() => setConfirmDeleteId(null)}>Nein</button>
-        </div>
-      ) : (
-        <button className="btn-icon-sm delete-btn" onClick={() => confirmDelete(c.id)}><Trash2 size={12} /></button>
-      )}
-    </div>
-  );
+    );
+  };
+
+  const isEmpty = sortedCompanies.length === 0 && unlinkedContacts.length === 0;
 
   return (
     <WidgetWrapper widgetId="contacts" title="Kontakte" icon={<Users size={16} />}>
       <div className="contacts-widget">
+
+        {/* Toolbar */}
         <div className="vault-toolbar">
           <div className="search-box">
             <Search size={14} />
             <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Suchen…" />
           </div>
-          <button
-            className={`btn-icon ${groupByCompany ? 'active' : ''}`}
-            onClick={() => setGroupByCompany(v => !v)}
-            title="Nach Firma gruppieren"
-          >
-            <Building size={15} />
-          </button>
-          <button className="btn-icon" onClick={openAdd}><Plus size={16} /></button>
+          <button className="btn-icon" onClick={openNewCompany} title="Neue Firma"><Building size={15} /></button>
+          <button className="btn-icon" onClick={() => openNewContact()} title="Neuer Kontakt"><Plus size={16} /></button>
         </div>
 
-        {showForm && (
+        {/* === FIRMA FORM === */}
+        {formMode === 'company' && (
           <div className="contact-form">
             <div className="contact-form-header">
-              <span>{editId ? 'Kontakt bearbeiten' : 'Neuer Kontakt'}</span>
-              <button className="btn-icon-sm" onClick={() => setShowForm(false)}><X size={14} /></button>
+              <span>{editCompanyId ? 'Firma bearbeiten' : 'Neue Firma'}</span>
+              <button className="btn-icon-sm" onClick={() => setFormMode('none')}><X size={14} /></button>
             </div>
 
-            {/* Avatar preview + upload */}
+            <div className="contact-form-avatar">
+              <div
+                className="company-logo-upload"
+                onClick={() => logoRef.current?.click()}
+                title="Logo auswählen"
+              >
+                {companyForm.logo
+                  ? <img src={companyForm.logo} alt="Logo" />
+                  : <div className="contact-avatar-placeholder"><ImageIcon size={20} /></div>
+                }
+              </div>
+              <div className="contact-form-avatar-actions">
+                <button className="btn-secondary btn-sm" onClick={() => logoRef.current?.click()}>
+                  <ImageIcon size={13} /> Logo
+                </button>
+                {companyForm.logo && (
+                  <button className="btn-secondary btn-sm" onClick={() => setCompanyForm(f => ({ ...f, logo: '' }))}>
+                    <X size={13} /> Entfernen
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="vault-form">
+              <input
+                placeholder="Firmenname *"
+                value={companyForm.name}
+                onChange={e => setCompanyForm({ ...companyForm, name: e.target.value })}
+              />
+              <input
+                placeholder="Telefon"
+                value={companyForm.phone}
+                onChange={e => setCompanyForm({ ...companyForm, phone: e.target.value })}
+              />
+              <input
+                placeholder="E-Mail"
+                value={companyForm.email}
+                onChange={e => setCompanyForm({ ...companyForm, email: e.target.value })}
+              />
+              <input
+                placeholder="Website"
+                value={companyForm.website}
+                onChange={e => setCompanyForm({ ...companyForm, website: e.target.value })}
+              />
+              <textarea
+                placeholder="Notizen"
+                value={companyForm.notes}
+                onChange={e => setCompanyForm({ ...companyForm, notes: e.target.value })}
+                rows={2}
+                style={{ resize: 'vertical', fontFamily: 'inherit', fontSize: '12px' }}
+              />
+              <div className="form-actions">
+                <button className="btn-primary" onClick={saveCompany}><Check size={14} /> Speichern</button>
+                <button className="btn-secondary" onClick={() => setFormMode('none')}>Abbrechen</button>
+                {editCompanyId && (
+                  confirmDeleteCompany === editCompanyId ? (
+                    <div className="contact-confirm-delete">
+                      <span>Firma löschen?</span>
+                      <button className="btn-confirm-yes" onClick={() => deleteCompany(editCompanyId)}>Ja</button>
+                      <button className="btn-confirm-no" onClick={() => setConfirmDeleteCompany(null)}>Nein</button>
+                    </div>
+                  ) : (
+                    <button className="btn-danger btn-sm" onClick={() => setConfirmDeleteCompany(editCompanyId)}>
+                      <Trash2 size={13} /> Löschen
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* === KONTAKT FORM === */}
+        {formMode === 'contact' && (
+          <div className="contact-form">
+            <div className="contact-form-header">
+              <span>{editContactId ? 'Kontakt bearbeiten' : 'Neuer Kontakt'}</span>
+              <button className="btn-icon-sm" onClick={() => setFormMode('none')}><X size={14} /></button>
+            </div>
+
             <div className="contact-form-avatar">
               <div
                 className="contact-form-avatar-preview"
-                onClick={() => photoInputRef.current?.click()}
+                onClick={() => photoRef.current?.click()}
                 title="Foto auswählen"
               >
-                {form.avatar
-                  ? <img src={form.avatar} alt="Avatar" />
+                {contactForm.avatar
+                  ? <img src={contactForm.avatar} alt="Avatar" />
                   : <div className="contact-avatar-placeholder"><Camera size={20} /></div>
                 }
               </div>
               <div className="contact-form-avatar-actions">
-                <button className="btn-secondary btn-sm" onClick={() => photoInputRef.current?.click()}>
+                <button className="btn-secondary btn-sm" onClick={() => photoRef.current?.click()}>
                   <Camera size={13} /> Foto
                 </button>
                 <button
                   className="btn-secondary btn-sm"
-                  onClick={() => cardInputRef.current?.click()}
+                  onClick={() => cardRef.current?.click()}
                   disabled={ocrLoading}
                 >
                   <Scan size={13} />
                   {ocrLoading ? `OCR ${ocrProgress}%` : 'Visitenkarte'}
                 </button>
-                {form.avatar && (
-                  <button className="btn-secondary btn-sm" onClick={() => setForm(f => ({ ...f, avatar: '' }))}>
-                    <X size={13} /> Foto entfernen
+                {contactForm.avatar && (
+                  <button className="btn-secondary btn-sm" onClick={() => setContactForm(f => ({ ...f, avatar: '' }))}>
+                    <X size={13} /> Entfernen
                   </button>
                 )}
               </div>
             </div>
-            <input type="file" ref={photoInputRef} accept="image/*" style={{ display: 'none' }} onChange={handlePhotoUpload} />
-            <input type="file" ref={cardInputRef} accept="image/jpeg,image/png,image/webp,image/gif" style={{ display: 'none' }} onChange={handleCardScan} />
 
             {scanError && (
               <div className="scan-error">
@@ -390,7 +555,6 @@ export default function ContactsWidget() {
               </div>
             )}
 
-            {/* OCR line picker */}
             {ocrLines.length > 0 && (
               <div className="ocr-picker">
                 <div className="ocr-picker-header">
@@ -403,10 +567,9 @@ export default function ContactsWidget() {
                     <div key={i} className="ocr-line">
                       <span className="ocr-line-text">{line}</span>
                       <div className="ocr-line-btns">
-                        <button onClick={() => assignOcrLine(line, 'name')} title="Als Name übernehmen">Name</button>
-                        <button onClick={() => assignOcrLine(line, 'company')} title="Als Firma übernehmen">Firma</button>
-                        <button onClick={() => assignOcrLine(line, 'email')} title="Als E-Mail übernehmen">Mail</button>
-                        <button onClick={() => assignOcrLine(line, 'phone')} title="Als Telefon übernehmen">Tel</button>
+                        <button onClick={() => setContactForm(f => ({ ...f, name: line }))}>Name</button>
+                        <button onClick={() => setContactForm(f => ({ ...f, email: line }))}>Mail</button>
+                        <button onClick={() => setContactForm(f => ({ ...f, phone: line }))}>Tel</button>
                       </div>
                     </div>
                   ))}
@@ -415,30 +578,55 @@ export default function ContactsWidget() {
             )}
 
             <div className="vault-form">
-              <input placeholder="Name *" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-              <input placeholder="Firma" value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} />
-              <input placeholder="E-Mail" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-              <input placeholder="Telefon" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
-              <input placeholder="Tags (kommagetrennt)" value={form.tags} onChange={e => setForm({ ...form, tags: e.target.value })} />
+              <input
+                placeholder="Name *"
+                value={contactForm.name}
+                onChange={e => setContactForm({ ...contactForm, name: e.target.value })}
+              />
+              <select
+                value={contactForm.companyId}
+                onChange={e => setContactForm({ ...contactForm, companyId: e.target.value })}
+                className="vault-select"
+              >
+                <option value="">— Ohne Firma —</option>
+                {sortedCompanyList.map(co => (
+                  <option key={co.id} value={co.id}>{co.name}</option>
+                ))}
+              </select>
+              <input
+                placeholder="E-Mail"
+                value={contactForm.email}
+                onChange={e => setContactForm({ ...contactForm, email: e.target.value })}
+              />
+              <input
+                placeholder="Telefon"
+                value={contactForm.phone}
+                onChange={e => setContactForm({ ...contactForm, phone: e.target.value })}
+              />
+              <input
+                placeholder="Tags (kommagetrennt)"
+                value={contactForm.tags}
+                onChange={e => setContactForm({ ...contactForm, tags: e.target.value })}
+              />
               <textarea
                 placeholder="Notizen"
-                value={form.notes}
-                onChange={e => setForm({ ...form, notes: e.target.value })}
+                value={contactForm.notes}
+                onChange={e => setContactForm({ ...contactForm, notes: e.target.value })}
                 rows={3}
                 style={{ resize: 'vertical', fontFamily: 'inherit', fontSize: '12px' }}
               />
               <div className="form-actions">
-                <button className="btn-primary" onClick={handleSave}><Check size={14} /> Speichern</button>
-                <button className="btn-secondary" onClick={() => setShowForm(false)}>Abbrechen</button>
-                {editId && (
-                  confirmDeleteId === editId ? (
+                <button className="btn-primary" onClick={saveContact}><Check size={14} /> Speichern</button>
+                <button className="btn-secondary" onClick={() => setFormMode('none')}>Abbrechen</button>
+                {editContactId && (
+                  confirmDeleteContact === editContactId ? (
                     <div className="contact-confirm-delete">
                       <span>Wirklich löschen?</span>
-                      <button className="btn-confirm-yes" onClick={() => handleDelete(editId)}>Ja</button>
-                      <button className="btn-confirm-no" onClick={() => setConfirmDeleteId(null)}>Nein</button>
+                      <button className="btn-confirm-yes" onClick={() => deleteContact(editContactId)}>Ja</button>
+                      <button className="btn-confirm-no" onClick={() => setConfirmDeleteContact(null)}>Nein</button>
                     </div>
                   ) : (
-                    <button className="btn-danger btn-sm" onClick={() => confirmDelete(editId)}>
+                    <button className="btn-danger btn-sm" onClick={() => setConfirmDeleteContact(editContactId)}>
                       <Trash2 size={13} /> Löschen
                     </button>
                   )
@@ -448,30 +636,105 @@ export default function ContactsWidget() {
           </div>
         )}
 
+        {/* Hidden file inputs (always mounted so refs stay valid) */}
+        <input type="file" ref={photoRef} accept="image/*" style={{ display: 'none' }} onChange={handlePhotoUpload} />
+        <input type="file" ref={cardRef} accept="image/jpeg,image/png,image/webp,image/gif" style={{ display: 'none' }} onChange={handleCardScan} />
+        <input type="file" ref={logoRef} accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
+
+        {/* === KONTAKT-LISTE === */}
         <div className="contact-list">
-          {grouped ? (
-            grouped.map(([company, members]) => (
-              <div key={company} className="contact-group">
-                <button className="contact-group-header" onClick={() => toggleGroup(company)}>
-                  {collapsedGroups.has(company)
-                    ? <ChevronRight size={14} />
-                    : <ChevronDown size={14} />
-                  }
-                  <Building size={13} className="contact-group-icon" />
-                  <span className="contact-group-name">{company}</span>
+
+          {/* Firmen-Blöcke */}
+          {sortedCompanies.map(co => {
+            const members = contactsByCompany.get(co.id) ?? [];
+            const isCollapsed = collapsed.has(co.id);
+            const isConfirmDelete = confirmDeleteCompany === co.id;
+
+            return (
+              <div key={co.id} className="company-block">
+                <div className="company-header">
+                  <button className="company-collapse-btn" onClick={() => toggleCollapse(co.id)}>
+                    {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                  </button>
+                  <div className="company-logo-display" onClick={() => openEditCompany(co)}>
+                    {co.logo
+                      ? <img src={co.logo} alt={co.name} className="company-logo-img" />
+                      : <div className="company-logo-placeholder" style={{ background: getAvatarColor(co.name) }}>
+                          {getInitials(co.name)}
+                        </div>
+                    }
+                  </div>
+                  <div className="company-info" onClick={() => openEditCompany(co)}>
+                    <span className="company-name">{co.name}</span>
+                    {(co.phone || co.email || co.website) && (
+                      <div className="company-details">
+                        {co.phone && <span className="contact-detail"><Phone size={10} /> {co.phone}</span>}
+                        {co.email && <span className="contact-detail"><Mail size={10} /> {co.email}</span>}
+                        {co.website && <span className="contact-detail"><Globe size={10} /> {co.website}</span>}
+                      </div>
+                    )}
+                  </div>
                   <span className="contact-group-count">{members.length}</span>
-                </button>
-                {!collapsedGroups.has(company) && (
-                  <div className="contact-group-members">
-                    {members.map(c => renderContact(c, true))}
+                  <button
+                    className="btn-icon-sm"
+                    onClick={() => openNewContact(co.id)}
+                    title="Person hinzufügen"
+                  >
+                    <Plus size={13} />
+                  </button>
+                  <button
+                    className="btn-icon-sm"
+                    onClick={() => openEditCompany(co)}
+                    title="Firma bearbeiten"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                  {isConfirmDelete ? (
+                    <div className="contact-confirm-delete">
+                      <span>Löschen?</span>
+                      <button className="btn-confirm-yes" onClick={() => deleteCompany(co.id)}>Ja</button>
+                      <button className="btn-confirm-no" onClick={() => setConfirmDeleteCompany(null)}>Nein</button>
+                    </div>
+                  ) : (
+                    <button className="btn-icon-sm" onClick={() => setConfirmDeleteCompany(co.id)}>
+                      <Trash2 size={12} />
+                    </button>
+                  )}
+                </div>
+
+                {!isCollapsed && members.length > 0 && (
+                  <div className="company-members">
+                    {members.map(c => renderContactCard(c, true))}
+                  </div>
+                )}
+                {!isCollapsed && members.length === 0 && (
+                  <div className="company-empty">
+                    <span>Noch keine Personen —&nbsp;</span>
+                    <button className="link-btn" onClick={() => openNewContact(co.id)}>Person hinzufügen</button>
                   </div>
                 )}
               </div>
-            ))
-          ) : (
-            filtered.map(c => renderContact(c))
+            );
+          })}
+
+          {/* Ohne Firma */}
+          {unlinkedContacts.length > 0 && (
+            <div className="company-block company-block--unlinked">
+              <button className="contact-group-header" onClick={() => toggleCollapse('__unlinked__')}>
+                {collapsed.has('__unlinked__') ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                <Users size={13} className="contact-group-icon" />
+                <span className="contact-group-name">Ohne Firma</span>
+                <span className="contact-group-count">{unlinkedContacts.length}</span>
+              </button>
+              {!collapsed.has('__unlinked__') && (
+                <div className="company-members">
+                  {unlinkedContacts.map(c => renderContactCard(c, false))}
+                </div>
+              )}
+            </div>
           )}
-          {filtered.length === 0 && (
+
+          {isEmpty && (
             <p className="empty-text">{search ? 'Keine Treffer' : 'Noch keine Kontakte'}</p>
           )}
         </div>

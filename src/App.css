@@ -1023,6 +1023,158 @@
   background: rgba(239, 68, 68, 0.2);
 }
 
+/* ===== COMPANY HIERARCHY (Contacts) ===== */
+
+/* Company block container */
+.company-block {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.company-block--unlinked {
+  border-style: dashed;
+  opacity: 0.85;
+}
+
+/* Company header row */
+.company-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+}
+
+.company-collapse-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+.company-collapse-btn:hover { color: var(--text-primary); }
+
+/* Logo display (36×36, rounded square) */
+.company-logo-display {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.company-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.company-logo-placeholder {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+}
+
+/* Company name + detail row */
+.company-info {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+.company-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.company-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+/* Members area */
+.company-members {
+  border-top: 1px solid var(--border);
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Empty company hint */
+.company-empty {
+  border-top: 1px solid var(--border);
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+}
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0;
+  text-decoration: underline;
+}
+.link-btn:hover { opacity: 0.8; }
+
+/* Logo upload in company form (square, not circle) */
+.company-logo-upload {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-md);
+  border: 2px dashed var(--border);
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+.company-logo-upload:hover { border-color: var(--accent); }
+.company-logo-upload img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Select dropdown in forms */
+.vault-select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-widget);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.vault-select:focus { border-color: var(--accent); }
+
 /* ===== NOTES ===== */
 .notes-list {
   display: flex;

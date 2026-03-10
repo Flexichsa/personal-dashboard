@@ -34,6 +34,7 @@ function keysToCamel(obj: Record<string, unknown>): Record<string, unknown> {
 // Map localStorage keys to Supabase table names
 const TABLE_MAP: Record<string, string> = {
   'contacts': 'contacts',
+  'companies': 'companies',
   'notes': 'notes',
   'bookmarks': 'bookmarks',
   'calendar-events': 'calendar_events',
