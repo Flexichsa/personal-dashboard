@@ -177,6 +177,7 @@ export default function ContactsWidget() {
   }, [companies]);
   const [confirmDeleteContact, setConfirmDeleteContact] = useState<string | null>(null);
   const [confirmDeleteCompany, setConfirmDeleteCompany] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // OCR state (Kontaktformular)
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -266,6 +267,7 @@ export default function ContactsWidget() {
     setEditCompanyId(null);
     setCompanyForm(EMPTY_COMPANY);
     resetSmartFill();
+    setFormError(null);
     setFormMode('company');
   };
 
@@ -282,7 +284,7 @@ export default function ContactsWidget() {
 
   // --- Save handlers ---
   const saveContact = () => {
-    if (!contactForm.name.trim()) return;
+    if (!contactForm.name.trim()) { setFormError('Bitte Name eingeben.'); return; }
     const base: Omit<Contact, 'id' | 'createdAt'> = {
       name: contactForm.name.trim(),
       email: contactForm.email || undefined,
@@ -302,7 +304,7 @@ export default function ContactsWidget() {
   };
 
   const saveCompany = () => {
-    if (!companyForm.name.trim()) return;
+    if (!companyForm.name.trim()) { setFormError('Bitte Firmenname eingeben.'); return; }
     const base: Omit<Company, 'id' | 'createdAt'> = {
       name: companyForm.name.trim(),
       logo: companyForm.logo || undefined,
@@ -601,7 +603,8 @@ export default function ContactsWidget() {
             {showSmartFill && <SmartFillPanel />}
 
             <div className="vault-form">
-              <input placeholder="Firmenname *" value={companyForm.name} onChange={e => setCompanyForm({ ...companyForm, name: e.target.value })} />
+              {formError && <div className="form-error-msg">{formError}</div>}
+              <input placeholder="Firmenname *" value={companyForm.name} onChange={e => { setCompanyForm({ ...companyForm, name: e.target.value }); setFormError(null); }} />
               <input placeholder="Telefon" value={companyForm.phone} onChange={e => setCompanyForm({ ...companyForm, phone: e.target.value })} />
               <input placeholder="E-Mail" value={companyForm.email} onChange={e => setCompanyForm({ ...companyForm, email: e.target.value })} />
               <input placeholder="Website" value={companyForm.website} onChange={e => setCompanyForm({ ...companyForm, website: e.target.value })} />

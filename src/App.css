@@ -850,6 +850,16 @@
   line-height: 1.4;
 }
 
+.form-error-msg {
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  color: var(--danger);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .contact-link {
   color: inherit;
   text-decoration: none;
