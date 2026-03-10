@@ -2,12 +2,18 @@ import { useState, useMemo, useRef } from 'react';
 import { v4 as uuid } from 'uuid';
 import {
   Users, Plus, Search, Trash2, Mail, Phone, Building, Tag,
-  Camera, ChevronDown, ChevronRight, X, Check, Scan, Globe, Pencil, Image as ImageIcon,
+  Camera, ChevronDown, ChevronRight, X, Check, Scan, Globe, Pencil,
+  Image as ImageIcon, Sparkles,
 } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import jsQR from 'jsqr';
 import WidgetWrapper from '../WidgetWrapper';
 import { useSupabase } from '../../hooks/useSupabase';
+import {
+  getAiApiKey, saveAiApiKey,
+  extractContactFromText, extractContactFromImage,
+  extractCompanyFromText, extractCompanyFromImage,
+} from '../../lib/aiExtract';
 import type { Contact, Company } from '../../types';
 
 // --- Image helpers ---
@@ -17,12 +23,10 @@ function compressToBase64(file: File, size = 80): Promise<string> {
     const url = URL.createObjectURL(file);
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      canvas.width = size;
-      canvas.height = size;
+      canvas.width = size; canvas.height = size;
       const ctx = canvas.getContext('2d')!;
       const ratio = Math.max(size / img.width, size / img.height);
-      const w = img.width * ratio;
-      const h = img.height * ratio;
+      const w = img.width * ratio; const h = img.height * ratio;
       ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
       URL.revokeObjectURL(url);
       resolve(canvas.toDataURL('image/jpeg', 0.75));
@@ -32,25 +36,40 @@ function compressToBase64(file: File, size = 80): Promise<string> {
   });
 }
 
+// Bild für KI — behält Seitenverhältnis, max 1024px
+function imageToBase64ForAI(file: File): Promise<{ base64: string; mimeType: string }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 1024;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      resolve({ base64: dataUrl.split(',')[1], mimeType: 'image/jpeg' });
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
 function extractOcrLines(text: string): string[] {
-  return text
-    .split(/[\n\r]+/)
-    .map(l => l.replace(/\s+/g, ' ').trim())
-    .filter(l => {
-      if (l.length < 4) return false;
-      const letters = (l.match(/[a-zA-ZÄÖÜäöüß]/g) ?? []).length;
-      if (letters < 2) return false;
-      if (letters / l.length < 0.35) return false;
-      return true;
-    });
+  return text.split(/[\n\r]+/).map(l => l.replace(/\s+/g, ' ').trim()).filter(l => {
+    if (l.length < 4) return false;
+    const letters = (l.match(/[a-zA-ZÄÖÜäöüß]/g) ?? []).length;
+    if (letters < 2) return false;
+    if (letters / l.length < 0.35) return false;
+    return true;
+  });
 }
 
 function isHeic(file: File): boolean {
-  return (
-    file.type === 'image/heic' ||
-    file.type === 'image/heif' ||
-    /\.(heic|heif)$/i.test(file.name)
-  );
+  return file.type === 'image/heic' || file.type === 'image/heif' || /\.(heic|heif)$/i.test(file.name);
 }
 
 function decodeQrFromFile(file: File): Promise<string | null> {
@@ -59,8 +78,7 @@ function decodeQrFromFile(file: File): Promise<string | null> {
     const url = URL.createObjectURL(file);
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
+      canvas.width = img.width; canvas.height = img.height;
       const ctx = canvas.getContext('2d')!;
       ctx.drawImage(img, 0, 0);
       URL.revokeObjectURL(url);
@@ -75,46 +93,32 @@ function decodeQrFromFile(file: File): Promise<string | null> {
 
 function parseVCard(text: string): Partial<{ name: string; email: string; phone: string }> | null {
   const result: Partial<{ name: string; email: string; phone: string }> = {};
-
   if (text.startsWith('MECARD:')) {
-    const inner = text.replace(/^MECARD:/, '');
-    inner.split(';').forEach(part => {
-      const idx = part.indexOf(':');
-      if (idx === -1) return;
+    text.replace(/^MECARD:/, '').split(';').forEach(part => {
+      const idx = part.indexOf(':'); if (idx === -1) return;
       const key = part.slice(0, idx).trim().toUpperCase();
-      const val = part.slice(idx + 1).trim();
-      if (!val) return;
-      switch (key) {
-        case 'N': result.name = val.split(',').reverse().join(' ').trim(); break;
-        case 'TEL': if (!result.phone) result.phone = val; break;
-        case 'EMAIL': if (!result.email) result.email = val.toLowerCase(); break;
-      }
+      const val = part.slice(idx + 1).trim(); if (!val) return;
+      if (key === 'N') result.name = val.split(',').reverse().join(' ').trim();
+      if (key === 'TEL' && !result.phone) result.phone = val;
+      if (key === 'EMAIL' && !result.email) result.email = val.toLowerCase();
     });
     return Object.keys(result).length > 0 ? result : null;
   }
-
   if (text.includes('BEGIN:VCARD')) {
     text.split(/[\r\n]+/).forEach(line => {
-      const idx = line.indexOf(':');
-      if (idx === -1) return;
+      const idx = line.indexOf(':'); if (idx === -1) return;
       const rawKey = line.slice(0, idx).split(';')[0].toUpperCase();
-      const val = line.slice(idx + 1).trim();
-      if (!val) return;
-      switch (rawKey) {
-        case 'FN': if (!result.name) result.name = val; break;
-        case 'N':
-          if (!result.name) {
-            const parts = val.split(';');
-            result.name = [parts[1], parts[0]].filter(Boolean).join(' ').trim();
-          }
-          break;
-        case 'EMAIL': if (!result.email) result.email = val.toLowerCase(); break;
-        case 'TEL': if (!result.phone) result.phone = val; break;
+      const val = line.slice(idx + 1).trim(); if (!val) return;
+      if (rawKey === 'FN' && !result.name) result.name = val;
+      if (rawKey === 'N' && !result.name) {
+        const parts = val.split(';');
+        result.name = [parts[1], parts[0]].filter(Boolean).join(' ').trim();
       }
+      if (rawKey === 'EMAIL' && !result.email) result.email = val.toLowerCase();
+      if (rawKey === 'TEL' && !result.phone) result.phone = val;
     });
     return Object.keys(result).length > 0 ? result : null;
   }
-
   return null;
 }
 
@@ -148,18 +152,30 @@ export default function ContactsWidget() {
   const [confirmDeleteContact, setConfirmDeleteContact] = useState<string | null>(null);
   const [confirmDeleteCompany, setConfirmDeleteCompany] = useState<string | null>(null);
 
+  // OCR state (Kontaktformular)
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   const [ocrLines, setOcrLines] = useState<string[]>([]);
   const [scanError, setScanError] = useState<string | null>(null);
 
+  // Smart Fill state
+  const [showSmartFill, setShowSmartFill] = useState(false);
+  const [sfText, setSfText] = useState('');
+  const [sfImage, setSfImage] = useState<{ base64: string; mimeType: string } | null>(null);
+  const [sfImageName, setSfImageName] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [hasApiKey, setHasApiKey] = useState(() => !!getAiApiKey());
+
+  // Refs
   const photoRef = useRef<HTMLInputElement>(null);
   const cardRef = useRef<HTMLInputElement>(null);
   const logoRef = useRef<HTMLInputElement>(null);
+  const sfImgRef = useRef<HTMLInputElement>(null);
 
   // --- Filtered & grouped data ---
   const q = search.toLowerCase();
-
   const filteredContacts = useMemo(() => {
     if (!q) return contacts;
     return contacts.filter(c =>
@@ -173,13 +189,8 @@ export default function ContactsWidget() {
 
   const filteredCompanies = useMemo(() => {
     if (!q) return companies;
-    const companyIdsWithMatches = new Set(
-      filteredContacts.filter(c => c.companyId).map(c => c.companyId!)
-    );
-    return companies.filter(co =>
-      co.name.toLowerCase().includes(q) ||
-      companyIdsWithMatches.has(co.id)
-    );
+    const ids = new Set(filteredContacts.filter(c => c.companyId).map(c => c.companyId!));
+    return companies.filter(co => co.name.toLowerCase().includes(q) || ids.has(co.id));
   }, [companies, filteredContacts, q]);
 
   const contactsByCompany = useMemo(() => {
@@ -193,59 +204,53 @@ export default function ContactsWidget() {
   }, [filteredContacts]);
 
   const unlinkedContacts = contactsByCompany.get('') ?? [];
+  const sortedCompanies = useMemo(() => [...filteredCompanies].sort((a, b) => a.name.localeCompare(b.name)), [filteredCompanies]);
+  const sortedCompanyList = useMemo(() => [...companies].sort((a, b) => a.name.localeCompare(b.name)), [companies]);
 
-  const sortedCompanies = useMemo(() =>
-    [...filteredCompanies].sort((a, b) => a.name.localeCompare(b.name)),
-    [filteredCompanies]
-  );
-
-  const sortedCompanyList = useMemo(() =>
-    [...companies].sort((a, b) => a.name.localeCompare(b.name)),
-    [companies]
-  );
+  const resetSmartFill = () => {
+    setShowSmartFill(false);
+    setSfText('');
+    setSfImage(null);
+    setSfImageName('');
+    setAiError(null);
+  };
 
   // --- Form openers ---
   const openNewContact = (preCompanyId = '') => {
     setEditContactId(null);
     setContactForm({ ...EMPTY_CONTACT, companyId: preCompanyId });
-    setOcrLines([]);
-    setScanError(null);
+    setOcrLines([]); setScanError(null);
+    resetSmartFill();
     setFormMode('contact');
   };
 
   const openEditContact = (c: Contact) => {
     setEditContactId(c.id);
     setContactForm({
-      name: c.name,
-      email: c.email ?? '',
-      phone: c.phone ?? '',
-      companyId: c.companyId ?? '',
-      tags: c.tags.join(', '),
-      notes: c.notes ?? '',
-      avatar: c.avatar ?? '',
+      name: c.name, email: c.email ?? '', phone: c.phone ?? '',
+      companyId: c.companyId ?? '', tags: c.tags.join(', '),
+      notes: c.notes ?? '', avatar: c.avatar ?? '',
     });
-    setOcrLines([]);
-    setScanError(null);
+    setOcrLines([]); setScanError(null);
+    resetSmartFill();
     setFormMode('contact');
   };
 
   const openNewCompany = () => {
     setEditCompanyId(null);
     setCompanyForm(EMPTY_COMPANY);
+    resetSmartFill();
     setFormMode('company');
   };
 
   const openEditCompany = (co: Company) => {
     setEditCompanyId(co.id);
     setCompanyForm({
-      name: co.name,
-      logo: co.logo ?? '',
-      phone: co.phone ?? '',
-      email: co.email ?? '',
-      website: co.website ?? '',
-      address: co.address ?? '',
-      notes: co.notes ?? '',
+      name: co.name, logo: co.logo ?? '', phone: co.phone ?? '',
+      email: co.email ?? '', website: co.website ?? '',
+      address: co.address ?? '', notes: co.notes ?? '',
     });
+    resetSmartFill();
     setFormMode('company');
   };
 
@@ -266,8 +271,7 @@ export default function ContactsWidget() {
     } else {
       setContacts(prev => [{ id: uuid(), createdAt: Date.now(), ...base }, ...prev]);
     }
-    setFormMode('none');
-    setEditContactId(null);
+    setFormMode('none'); setEditContactId(null);
   };
 
   const saveCompany = () => {
@@ -286,8 +290,7 @@ export default function ContactsWidget() {
     } else {
       setCompanies(prev => [{ id: uuid(), createdAt: Date.now(), ...base }, ...prev]);
     }
-    setFormMode('none');
-    setEditCompanyId(null);
+    setFormMode('none'); setEditCompanyId(null);
   };
 
   const deleteContact = (id: string) => {
@@ -297,7 +300,6 @@ export default function ContactsWidget() {
   };
 
   const deleteCompany = (id: string) => {
-    // Verknüpfung aller zugehörigen Kontakte aufheben
     setContacts(prev => prev.map(c => c.companyId === id ? { ...c, companyId: undefined } : c));
     setCompanies(prev => prev.filter(co => co.id !== id));
     setConfirmDeleteCompany(null);
@@ -314,53 +316,32 @@ export default function ContactsWidget() {
 
   // --- File uploads ---
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const b64 = await compressToBase64(file, 80);
-      setContactForm(f => ({ ...f, avatar: b64 }));
-    } catch { /* ignore */ }
+    const file = e.target.files?.[0]; if (!file) return;
+    try { const b64 = await compressToBase64(file, 80); setContactForm(f => ({ ...f, avatar: b64 })); } catch { /* ignore */ }
     e.target.value = '';
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const b64 = await compressToBase64(file, 100);
-      setCompanyForm(f => ({ ...f, logo: b64 }));
-    } catch { /* ignore */ }
+    const file = e.target.files?.[0]; if (!file) return;
+    try { const b64 = await compressToBase64(file, 100); setCompanyForm(f => ({ ...f, logo: b64 })); } catch { /* ignore */ }
     e.target.value = '';
   };
 
   const handleCardScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setScanError(null);
-    setOcrLines([]);
-
+    const file = e.target.files?.[0]; if (!file) return;
+    setScanError(null); setOcrLines([]);
     if (isHeic(file)) {
-      setScanError('HEIC-Format nicht unterstützt. iPhone: Einstellungen → Kamera → Format → „Maximale Kompatibilität". Dann erneut scannen.');
-      e.target.value = '';
-      return;
+      setScanError('HEIC-Format nicht unterstützt. iPhone: Einstellungen → Kamera → Format → „Maximale Kompatibilität".');
+      e.target.value = ''; return;
     }
-
-    setOcrLoading(true);
-    setOcrProgress(0);
+    setOcrLoading(true); setOcrProgress(0);
     try {
       const qrData = await decodeQrFromFile(file);
       if (qrData) {
         const parsed = parseVCard(qrData);
         if (parsed) {
-          setContactForm(f => ({
-            ...f,
-            name: parsed.name || f.name,
-            email: parsed.email || f.email,
-            phone: parsed.phone || f.phone,
-          }));
-          setOcrLoading(false);
-          e.target.value = '';
-          return;
+          setContactForm(f => ({ ...f, name: parsed.name || f.name, email: parsed.email || f.email, phone: parsed.phone || f.phone }));
+          setOcrLoading(false); e.target.value = ''; return;
         }
       }
       const result = await Tesseract.recognize(file, 'deu+eng', {
@@ -368,11 +349,132 @@ export default function ContactsWidget() {
       });
       setOcrLines(extractOcrLines(result.data.text));
     } catch { /* ignore */ }
-    setOcrLoading(false);
+    setOcrLoading(false); e.target.value = '';
+  };
+
+  // --- Smart Fill image upload ---
+  const handleSfImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    try {
+      const result = await imageToBase64ForAI(file);
+      setSfImage(result);
+      setSfImageName(file.name);
+      setAiError(null);
+    } catch { setAiError('Bild konnte nicht geladen werden.'); }
     e.target.value = '';
   };
 
-  // --- Render helpers ---
+  // --- Smart Fill API key save ---
+  const handleSaveApiKey = () => {
+    if (!apiKeyInput.trim()) return;
+    saveAiApiKey(apiKeyInput.trim());
+    setHasApiKey(true);
+    setApiKeyInput('');
+  };
+
+  // --- Smart Fill: AI extraction ---
+  const handleSmartFill = async () => {
+    const apiKey = getAiApiKey();
+    if (!apiKey) { setAiError('Bitte zuerst den Anthropic API Key eingeben.'); return; }
+    if (!sfText.trim() && !sfImage) { setAiError('Bitte Text einfügen oder ein Bild hochladen.'); return; }
+
+    setAiLoading(true); setAiError(null);
+    try {
+      if (formMode === 'contact') {
+        const result = sfImage
+          ? await extractContactFromImage(sfImage.base64, sfImage.mimeType, apiKey)
+          : await extractContactFromText(sfText, apiKey);
+        setContactForm(f => ({
+          ...f,
+          name: result.name || f.name,
+          email: result.email || f.email,
+          phone: result.phone || f.phone,
+          // Firma per Name suchen und companyId setzen
+          companyId: result.company
+            ? (sortedCompanyList.find(co => co.name.toLowerCase() === result.company!.toLowerCase())?.id ?? f.companyId)
+            : f.companyId,
+        }));
+      } else if (formMode === 'company') {
+        const result = sfImage
+          ? await extractCompanyFromImage(sfImage.base64, sfImage.mimeType, apiKey)
+          : await extractCompanyFromText(sfText, apiKey);
+        setCompanyForm(f => ({
+          ...f,
+          name: result.name || f.name,
+          phone: result.phone || f.phone,
+          email: result.email || f.email,
+          website: result.website || f.website,
+          address: result.address || f.address,
+        }));
+      }
+      resetSmartFill();
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Fehler bei der KI-Extraktion.');
+    }
+    setAiLoading(false);
+  };
+
+  // --- Smart Fill Panel ---
+  const SmartFillPanel = () => (
+    <div className="smart-fill-panel">
+      <div className="smart-fill-header">
+        <Sparkles size={13} />
+        <span>KI-Extraktion — Text oder Bild einfügen</span>
+        <button className="btn-icon-sm" onClick={resetSmartFill}><X size={12} /></button>
+      </div>
+
+      {!hasApiKey && (
+        <div className="smart-fill-apikey">
+          <input
+            type="password"
+            placeholder="Anthropic API Key (sk-ant-…)"
+            value={apiKeyInput}
+            onChange={e => setApiKeyInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSaveApiKey()}
+          />
+          <button className="btn-secondary btn-sm" onClick={handleSaveApiKey}>
+            <Check size={12} /> Speichern
+          </button>
+        </div>
+      )}
+
+      <textarea
+        className="smart-fill-textarea"
+        placeholder="E-Mail, Signatur, Text mit Kontaktdaten einfügen…"
+        value={sfText}
+        onChange={e => setSfText(e.target.value)}
+        rows={4}
+      />
+
+      <div className="smart-fill-actions">
+        <button className="btn-secondary btn-sm" onClick={() => sfImgRef.current?.click()}>
+          <Camera size={13} /> {sfImageName || 'Bild hochladen'}
+        </button>
+        {sfImage && (
+          <button className="btn-secondary btn-sm" onClick={() => { setSfImage(null); setSfImageName(''); }}>
+            <X size={12} />
+          </button>
+        )}
+        <button
+          className="btn-primary btn-sm"
+          onClick={handleSmartFill}
+          disabled={aiLoading || (!sfText.trim() && !sfImage)}
+          style={{ marginLeft: 'auto' }}
+        >
+          <Sparkles size={13} />
+          {aiLoading ? 'Analysiere…' : 'Ausfüllen'}
+        </button>
+      </div>
+
+      {aiError && (
+        <div className="scan-error" style={{ marginTop: '6px' }}>
+          <X size={13} /><span>{aiError}</span>
+        </div>
+      )}
+    </div>
+  );
+
+  // --- Render contact card ---
   const renderContactCard = (c: Contact, hideCompany = true) => {
     const isConfirmDelete = confirmDeleteContact === c.id;
     return (
@@ -386,9 +488,7 @@ export default function ContactsWidget() {
         <div className="contact-info" onClick={() => openEditContact(c)}>
           <strong>{c.name}</strong>
           {!hideCompany && c.companyId && (
-            <span className="contact-detail">
-              <Building size={11} /> {companies.find(co => co.id === c.companyId)?.name ?? ''}
-            </span>
+            <span className="contact-detail"><Building size={11} /> {companies.find(co => co.id === c.companyId)?.name ?? ''}</span>
           )}
           {!hideCompany && !c.companyId && c.company && (
             <span className="contact-detail"><Building size={11} /> {c.company}</span>
@@ -439,11 +539,7 @@ export default function ContactsWidget() {
             </div>
 
             <div className="contact-form-avatar">
-              <div
-                className="company-logo-upload"
-                onClick={() => logoRef.current?.click()}
-                title="Logo auswählen"
-              >
+              <div className="company-logo-upload" onClick={() => logoRef.current?.click()} title="Logo auswählen">
                 {companyForm.logo
                   ? <img src={companyForm.logo} alt="Logo" />
                   : <div className="contact-avatar-placeholder"><ImageIcon size={20} /></div>
@@ -458,35 +554,24 @@ export default function ContactsWidget() {
                     <X size={13} /> Entfernen
                   </button>
                 )}
+                <button
+                  className={`btn-secondary btn-sm${showSmartFill ? ' active' : ''}`}
+                  onClick={() => setShowSmartFill(v => !v)}
+                  title="KI-Extraktion"
+                >
+                  <Sparkles size={13} /> Smart Fill
+                </button>
               </div>
             </div>
 
+            {showSmartFill && <SmartFillPanel />}
+
             <div className="vault-form">
-              <input
-                placeholder="Firmenname *"
-                value={companyForm.name}
-                onChange={e => setCompanyForm({ ...companyForm, name: e.target.value })}
-              />
-              <input
-                placeholder="Telefon"
-                value={companyForm.phone}
-                onChange={e => setCompanyForm({ ...companyForm, phone: e.target.value })}
-              />
-              <input
-                placeholder="E-Mail"
-                value={companyForm.email}
-                onChange={e => setCompanyForm({ ...companyForm, email: e.target.value })}
-              />
-              <input
-                placeholder="Website"
-                value={companyForm.website}
-                onChange={e => setCompanyForm({ ...companyForm, website: e.target.value })}
-              />
-              <input
-                placeholder="Adresse"
-                value={companyForm.address}
-                onChange={e => setCompanyForm({ ...companyForm, address: e.target.value })}
-              />
+              <input placeholder="Firmenname *" value={companyForm.name} onChange={e => setCompanyForm({ ...companyForm, name: e.target.value })} />
+              <input placeholder="Telefon" value={companyForm.phone} onChange={e => setCompanyForm({ ...companyForm, phone: e.target.value })} />
+              <input placeholder="E-Mail" value={companyForm.email} onChange={e => setCompanyForm({ ...companyForm, email: e.target.value })} />
+              <input placeholder="Website" value={companyForm.website} onChange={e => setCompanyForm({ ...companyForm, website: e.target.value })} />
+              <input placeholder="Adresse" value={companyForm.address} onChange={e => setCompanyForm({ ...companyForm, address: e.target.value })} />
               <textarea
                 placeholder="Notizen"
                 value={companyForm.notes}
@@ -524,11 +609,7 @@ export default function ContactsWidget() {
             </div>
 
             <div className="contact-form-avatar">
-              <div
-                className="contact-form-avatar-preview"
-                onClick={() => photoRef.current?.click()}
-                title="Foto auswählen"
-              >
+              <div className="contact-form-avatar-preview" onClick={() => photoRef.current?.click()} title="Foto auswählen">
                 {contactForm.avatar
                   ? <img src={contactForm.avatar} alt="Avatar" />
                   : <div className="contact-avatar-placeholder"><Camera size={20} /></div>
@@ -538,26 +619,29 @@ export default function ContactsWidget() {
                 <button className="btn-secondary btn-sm" onClick={() => photoRef.current?.click()}>
                   <Camera size={13} /> Foto
                 </button>
-                <button
-                  className="btn-secondary btn-sm"
-                  onClick={() => cardRef.current?.click()}
-                  disabled={ocrLoading}
-                >
-                  <Scan size={13} />
-                  {ocrLoading ? `OCR ${ocrProgress}%` : 'Visitenkarte'}
+                <button className="btn-secondary btn-sm" onClick={() => cardRef.current?.click()} disabled={ocrLoading}>
+                  <Scan size={13} /> {ocrLoading ? `OCR ${ocrProgress}%` : 'Visitenkarte'}
                 </button>
                 {contactForm.avatar && (
                   <button className="btn-secondary btn-sm" onClick={() => setContactForm(f => ({ ...f, avatar: '' }))}>
                     <X size={13} /> Entfernen
                   </button>
                 )}
+                <button
+                  className={`btn-secondary btn-sm${showSmartFill ? ' active' : ''}`}
+                  onClick={() => setShowSmartFill(v => !v)}
+                  title="KI-Extraktion"
+                >
+                  <Sparkles size={13} /> Smart Fill
+                </button>
               </div>
             </div>
 
+            {showSmartFill && <SmartFillPanel />}
+
             {scanError && (
               <div className="scan-error">
-                <X size={13} />
-                <span>{scanError}</span>
+                <X size={13} /><span>{scanError}</span>
                 <button className="btn-icon-sm" onClick={() => setScanError(null)}><X size={11} /></button>
               </div>
             )}
@@ -585,36 +669,14 @@ export default function ContactsWidget() {
             )}
 
             <div className="vault-form">
-              <input
-                placeholder="Name *"
-                value={contactForm.name}
-                onChange={e => setContactForm({ ...contactForm, name: e.target.value })}
-              />
-              <select
-                value={contactForm.companyId}
-                onChange={e => setContactForm({ ...contactForm, companyId: e.target.value })}
-                className="vault-select"
-              >
+              <input placeholder="Name *" value={contactForm.name} onChange={e => setContactForm({ ...contactForm, name: e.target.value })} />
+              <select value={contactForm.companyId} onChange={e => setContactForm({ ...contactForm, companyId: e.target.value })} className="vault-select">
                 <option value="">— Ohne Firma —</option>
-                {sortedCompanyList.map(co => (
-                  <option key={co.id} value={co.id}>{co.name}</option>
-                ))}
+                {sortedCompanyList.map(co => <option key={co.id} value={co.id}>{co.name}</option>)}
               </select>
-              <input
-                placeholder="E-Mail"
-                value={contactForm.email}
-                onChange={e => setContactForm({ ...contactForm, email: e.target.value })}
-              />
-              <input
-                placeholder="Telefon"
-                value={contactForm.phone}
-                onChange={e => setContactForm({ ...contactForm, phone: e.target.value })}
-              />
-              <input
-                placeholder="Tags (kommagetrennt)"
-                value={contactForm.tags}
-                onChange={e => setContactForm({ ...contactForm, tags: e.target.value })}
-              />
+              <input placeholder="E-Mail" value={contactForm.email} onChange={e => setContactForm({ ...contactForm, email: e.target.value })} />
+              <input placeholder="Telefon" value={contactForm.phone} onChange={e => setContactForm({ ...contactForm, phone: e.target.value })} />
+              <input placeholder="Tags (kommagetrennt)" value={contactForm.tags} onChange={e => setContactForm({ ...contactForm, tags: e.target.value })} />
               <textarea
                 placeholder="Notizen"
                 value={contactForm.notes}
@@ -643,20 +705,18 @@ export default function ContactsWidget() {
           </div>
         )}
 
-        {/* Hidden file inputs (always mounted so refs stay valid) */}
+        {/* Hidden file inputs */}
         <input type="file" ref={photoRef} accept="image/*" style={{ display: 'none' }} onChange={handlePhotoUpload} />
         <input type="file" ref={cardRef} accept="image/jpeg,image/png,image/webp,image/gif" style={{ display: 'none' }} onChange={handleCardScan} />
         <input type="file" ref={logoRef} accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
+        <input type="file" ref={sfImgRef} accept="image/*" style={{ display: 'none' }} onChange={handleSfImageUpload} />
 
         {/* === KONTAKT-LISTE === */}
         <div className="contact-list">
-
-          {/* Firmen-Blöcke */}
           {sortedCompanies.map(co => {
             const members = contactsByCompany.get(co.id) ?? [];
             const isCollapsed = collapsed.has(co.id);
             const isConfirmDelete = confirmDeleteCompany === co.id;
-
             return (
               <div key={co.id} className="company-block">
                 <div className="company-header">
@@ -666,9 +726,7 @@ export default function ContactsWidget() {
                   <div className="company-logo-display" onClick={() => openEditCompany(co)}>
                     {co.logo
                       ? <img src={co.logo} alt={co.name} className="company-logo-img" />
-                      : <div className="company-logo-placeholder" style={{ background: getAvatarColor(co.name) }}>
-                          {getInitials(co.name)}
-                        </div>
+                      : <div className="company-logo-placeholder" style={{ background: getAvatarColor(co.name) }}>{getInitials(co.name)}</div>
                     }
                   </div>
                   <div className="company-info" onClick={() => openEditCompany(co)}>
@@ -682,20 +740,8 @@ export default function ContactsWidget() {
                     )}
                   </div>
                   <span className="contact-group-count">{members.length}</span>
-                  <button
-                    className="btn-icon-sm"
-                    onClick={() => openNewContact(co.id)}
-                    title="Person hinzufügen"
-                  >
-                    <Plus size={13} />
-                  </button>
-                  <button
-                    className="btn-icon-sm"
-                    onClick={() => openEditCompany(co)}
-                    title="Firma bearbeiten"
-                  >
-                    <Pencil size={12} />
-                  </button>
+                  <button className="btn-icon-sm" onClick={() => openNewContact(co.id)} title="Person hinzufügen"><Plus size={13} /></button>
+                  <button className="btn-icon-sm" onClick={() => openEditCompany(co)} title="Firma bearbeiten"><Pencil size={12} /></button>
                   {isConfirmDelete ? (
                     <div className="contact-confirm-delete">
                       <span>Löschen?</span>
@@ -703,16 +749,11 @@ export default function ContactsWidget() {
                       <button className="btn-confirm-no" onClick={() => setConfirmDeleteCompany(null)}>Nein</button>
                     </div>
                   ) : (
-                    <button className="btn-icon-sm" onClick={() => setConfirmDeleteCompany(co.id)}>
-                      <Trash2 size={12} />
-                    </button>
+                    <button className="btn-icon-sm" onClick={() => setConfirmDeleteCompany(co.id)}><Trash2 size={12} /></button>
                   )}
                 </div>
-
                 {!isCollapsed && members.length > 0 && (
-                  <div className="company-members">
-                    {members.map(c => renderContactCard(c, true))}
-                  </div>
+                  <div className="company-members">{members.map(c => renderContactCard(c, true))}</div>
                 )}
                 {!isCollapsed && members.length === 0 && (
                   <div className="company-empty">
@@ -724,7 +765,6 @@ export default function ContactsWidget() {
             );
           })}
 
-          {/* Ohne Firma */}
           {unlinkedContacts.length > 0 && (
             <div className="company-block company-block--unlinked">
               <button className="contact-group-header" onClick={() => toggleCollapse('__unlinked__')}>
@@ -734,16 +774,12 @@ export default function ContactsWidget() {
                 <span className="contact-group-count">{unlinkedContacts.length}</span>
               </button>
               {!collapsed.has('__unlinked__') && (
-                <div className="company-members">
-                  {unlinkedContacts.map(c => renderContactCard(c, false))}
-                </div>
+                <div className="company-members">{unlinkedContacts.map(c => renderContactCard(c, false))}</div>
               )}
             </div>
           )}
 
-          {isEmpty && (
-            <p className="empty-text">{search ? 'Keine Treffer' : 'Noch keine Kontakte'}</p>
-          )}
+          {isEmpty && <p className="empty-text">{search ? 'Keine Treffer' : 'Noch keine Kontakte'}</p>}
         </div>
       </div>
     </WidgetWrapper>

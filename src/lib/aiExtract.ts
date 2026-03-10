@@ -1,0 +1,133 @@
+// AI-gestützte Feldextraktion via Claude API (direkt vom Browser)
+// API-Key wird im localStorage gespeichert, nie committet.
+
+const LS_AI_KEY = 'dashboard_ai_api_key';
+
+export function getAiApiKey(): string {
+  return localStorage.getItem(LS_AI_KEY) ?? '';
+}
+
+export function saveAiApiKey(key: string): void {
+  localStorage.setItem(LS_AI_KEY, key.trim());
+}
+
+export interface ContactExtract {
+  name?: string;
+  email?: string;
+  phone?: string;
+  company?: string;
+}
+
+export interface CompanyExtract {
+  name?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  address?: string;
+}
+
+async function callClaude(
+  apiKey: string,
+  content: unknown,
+): Promise<string> {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 512,
+      messages: [{ role: 'user', content }],
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { error?: { message?: string } };
+    throw new Error(err?.error?.message ?? `API-Fehler ${res.status}`);
+  }
+
+  const data = await res.json() as { content?: Array<{ text?: string }> };
+  return data.content?.[0]?.text ?? '';
+}
+
+function parseJson<T>(text: string): T | null {
+  const match = text.match(/```(?:json)?\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
+  const jsonStr = match ? match[1] : text;
+  try {
+    return JSON.parse(jsonStr.trim()) as T;
+  } catch {
+    return null;
+  }
+}
+
+// --- Kontakt aus Text ---
+export async function extractContactFromText(
+  text: string,
+  apiKey: string,
+): Promise<ContactExtract> {
+  const prompt = `Extrahiere Kontaktdaten aus diesem Text. Antworte NUR mit einem JSON-Objekt mit diesen optionalen Feldern: name, email, phone, company. Nur Felder die eindeutig vorhanden sind.
+
+Text:
+${text}
+
+Nur JSON zurückgeben, keine Erklärung.`;
+
+  const reply = await callClaude(apiKey, prompt);
+  return parseJson<ContactExtract>(reply) ?? {};
+}
+
+// --- Kontakt aus Bild ---
+export async function extractContactFromImage(
+  base64: string,
+  mimeType: string,
+  apiKey: string,
+): Promise<ContactExtract> {
+  const content = [
+    { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
+    {
+      type: 'text',
+      text: 'Extrahiere Kontaktdaten aus diesem Bild (Visitenkarte, E-Mail-Signatur, etc.). Antworte NUR mit einem JSON-Objekt mit diesen optionalen Feldern: name, email, phone, company. Nur Felder die eindeutig sichtbar sind. Nur JSON zurückgeben.',
+    },
+  ];
+
+  const reply = await callClaude(apiKey, content);
+  return parseJson<ContactExtract>(reply) ?? {};
+}
+
+// --- Firma aus Text ---
+export async function extractCompanyFromText(
+  text: string,
+  apiKey: string,
+): Promise<CompanyExtract> {
+  const prompt = `Extrahiere Firmendaten aus diesem Text. Antworte NUR mit einem JSON-Objekt mit diesen optionalen Feldern: name, phone, email, website, address. Nur Felder die eindeutig vorhanden sind.
+
+Text:
+${text}
+
+Nur JSON zurückgeben, keine Erklärung.`;
+
+  const reply = await callClaude(apiKey, prompt);
+  return parseJson<CompanyExtract>(reply) ?? {};
+}
+
+// --- Firma aus Bild ---
+export async function extractCompanyFromImage(
+  base64: string,
+  mimeType: string,
+  apiKey: string,
+): Promise<CompanyExtract> {
+  const content = [
+    { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
+    {
+      type: 'text',
+      text: 'Extrahiere Firmendaten aus diesem Bild (Briefkopf, Visitenkarte, Website-Screenshot, etc.). Antworte NUR mit einem JSON-Objekt mit diesen optionalen Feldern: name, phone, email, website, address. Nur Felder die eindeutig sichtbar sind. Nur JSON zurückgeben.',
+    },
+  ];
+
+  const reply = await callClaude(apiKey, content);
+  return parseJson<CompanyExtract>(reply) ?? {};
+}

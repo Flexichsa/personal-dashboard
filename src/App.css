@@ -1181,6 +1181,75 @@
 }
 .vault-select:focus { border-color: var(--accent); }
 
+/* ===== SMART FILL PANEL ===== */
+.smart-fill-panel {
+  background: rgba(124, 58, 237, 0.06);
+  border: 1px solid rgba(124, 58, 237, 0.25);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  margin-bottom: 8px;
+}
+
+.smart-fill-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.smart-fill-header span { flex: 1; }
+
+.smart-fill-apikey {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.smart-fill-apikey input {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-widget);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-family: monospace;
+  outline: none;
+}
+.smart-fill-apikey input:focus { border-color: var(--accent); }
+
+.smart-fill-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-widget);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+  margin-bottom: 6px;
+  transition: border-color 0.15s;
+}
+.smart-fill-textarea:focus { border-color: var(--accent); }
+
+.smart-fill-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Active state for Smart Fill toggle button */
+.btn-secondary.active {
+  background: rgba(124, 58, 237, 0.15);
+  border-color: rgba(124, 58, 237, 0.4);
+  color: var(--accent);
+}
+
 /* ===== NOTES ===== */
 .notes-list {
   display: flex;
