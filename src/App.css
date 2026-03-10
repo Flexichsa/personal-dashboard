@@ -4618,7 +4618,7 @@
 
 .macstats-rings {
   display: flex;
-  gap: 16px;
+  gap: 8px;
   justify-content: center;
   padding: 4px 0;
 }
@@ -4626,7 +4626,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  flex: 1;
 }
 .macstats-ring-wrap {
   position: relative;
@@ -4636,16 +4637,21 @@
 }
 .macstats-ring-val {
   position: absolute;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 .macstats-ring-label {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-muted);
   display: flex;
   align-items: center;
   gap: 3px;
+}
+.macstats-ring-sub {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .macstats-divider {
@@ -4710,6 +4716,15 @@
   font-size: 11px;
   color: var(--text-muted);
   margin-left: auto;
+}
+.macstats-net-lifetime {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
 }
 
 .macstats-docker {
