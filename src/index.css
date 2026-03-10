@@ -30,6 +30,11 @@
   --accent-hover: #8b5cf6;
   --accent-secondary: #06b6d4;
 
+  /* Company accent — Teal for firm/org distinction */
+  --accent-company: #0d9488;
+  --accent-company-glow: rgba(13, 148, 136, 0.15);
+  --accent-company-subtle: rgba(13, 148, 136, 0.07);
+
   /* Status */
   --success: #34d399;
   --warning: #fbbf24;
