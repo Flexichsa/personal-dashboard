@@ -255,7 +255,7 @@ export default function App() {
   const [editingName, setEditingName] = useState('');
   const [addingPage, setAddingPage] = useState(false);
   const [newPageName, setNewPageName] = useState('');
-  const [theme, setTheme] = useLocalStorage<'light' | 'dark'>('theme', 'dark');
+  const [theme, setTheme] = useLocalStorage<'light' | 'dark'>('theme', 'light');
   const [maximizedWidget, setMaximizedWidget] = useState<string | null>(null);
 
   const { width, containerRef, mounted } = useContainerWidth({ initialWidth: typeof window !== 'undefined' ? window.innerWidth - 32 : 1200 });

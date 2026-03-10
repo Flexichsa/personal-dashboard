@@ -100,30 +100,41 @@
   --ease-out: cubic-bezier(0.33, 1, 0.68, 1);
 }
 
-/* ===== LIGHT MODE (optional toggle) ===== */
+/* ===== LIGHT MODE ===== */
 [data-theme="light"] {
-  --bg-primary: #f5f5fa;
-  --bg-secondary: #eeeef4;
-  --bg-card: rgba(255, 255, 255, 0.78);
-  --bg-card-hover: rgba(255, 255, 255, 0.92);
-  --bg-input: rgba(0, 0, 0, 0.04);
-  --bg-input-focus: rgba(0, 0, 0, 0.07);
+  /* Warme, helle Hintergründe */
+  --bg-primary: #f0f0f8;
+  --bg-secondary: #e8e8f2;
+  --bg-card: rgba(255, 255, 255, 0.94);
+  --bg-card-hover: rgba(255, 255, 255, 1);
+  --bg-input: rgba(0, 0, 0, 0.05);
+  --bg-input-focus: rgba(0, 0, 0, 0.09);
 
-  --text-primary: #1a1a2e;
-  --text-secondary: #64648c;
-  --text-muted: #9e9eb8;
+  /* Klarer Text mit guter Hierarchie */
+  --text-primary: #111128;
+  --text-secondary: #555578;
+  --text-muted: #8888aa;
 
-  --border: rgba(0, 0, 0, 0.08);
-  --border-hover: rgba(0, 0, 0, 0.15);
-  --border-accent: rgba(124, 58, 237, 0.3);
+  /* Sichtbare, aber weiche Borders */
+  --border: rgba(0, 0, 0, 0.10);
+  --border-hover: rgba(0, 0, 0, 0.20);
+  --border-accent: rgba(124, 58, 237, 0.35);
 
-  --bg-glass-active: rgba(240, 238, 245, 1);
+  /* Accent Glows etwas stärker im Hellen */
+  --accent-glow: rgba(124, 58, 237, 0.12);
+  --accent-company-subtle: rgba(13, 148, 136, 0.09);
+  --accent-company-glow: rgba(13, 148, 136, 0.12);
 
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05),
-                 0 8px 32px rgba(0, 0, 0, 0.07);
-  --shadow-card-hover: 0 4px 16px rgba(0, 0, 0, 0.08),
-                       0 12px 48px rgba(0, 0, 0, 0.1);
-  --shadow-glow: 0 0 30px rgba(124, 58, 237, 0.06);
+  --bg-glass-active: rgba(238, 236, 248, 1);
+
+  /* Tiefere Schatten im Light Mode für echte Tiefe */
+  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.07),
+                 0 8px 24px rgba(0, 0, 0, 0.09),
+                 inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --shadow-card-hover: 0 4px 16px rgba(0, 0, 0, 0.10),
+                       0 16px 48px rgba(0, 0, 0, 0.12),
+                       0 0 32px rgba(124, 58, 237, 0.06);
+  --shadow-glow: 0 0 30px rgba(124, 58, 237, 0.08);
 }
 
 html, body {
