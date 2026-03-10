@@ -850,6 +850,16 @@
   line-height: 1.4;
 }
 
+.contact-link {
+  color: inherit;
+  text-decoration: none;
+}
+.contact-link:hover {
+  color: var(--accent-secondary);
+  text-decoration: underline;
+}
+
+
 .contact-tags {
   display: flex;
   gap: 4px;

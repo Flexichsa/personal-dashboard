@@ -496,8 +496,8 @@ export default function ContactsWidget() {
           {!hideCompany && !c.companyId && c.company && (
             <span className="contact-detail"><Building size={11} /> {c.company}</span>
           )}
-          {c.email && <span className="contact-detail"><Mail size={11} /> {c.email}</span>}
-          {c.phone && <span className="contact-detail"><Phone size={11} /> {c.phone}</span>}
+          {c.email && <span className="contact-detail"><Mail size={11} /> <a href={`mailto:${c.email}`} className="contact-link" onClick={e => e.stopPropagation()}>{c.email}</a></span>}
+          {c.phone && <span className="contact-detail"><Phone size={11} /> <a href={`tel:${c.phone}`} className="contact-link" onClick={e => e.stopPropagation()}>{c.phone}</a></span>}
           {c.tags.length > 0 && (
             <div className="contact-tags">
               {c.tags.map(tag => <span key={tag} className="tag"><Tag size={10} /> {tag}</span>)}
@@ -757,9 +757,9 @@ export default function ContactsWidget() {
                     <span className="company-name">{co.name}</span>
                     {(co.phone || co.email || co.website) && (
                       <div className="company-details">
-                        {co.phone && <span className="contact-detail"><Phone size={10} /> {co.phone}</span>}
-                        {co.email && <span className="contact-detail"><Mail size={10} /> {co.email}</span>}
-                        {co.website && <span className="contact-detail"><Globe size={10} /> {co.website}</span>}
+                        {co.phone && <span className="contact-detail"><Phone size={10} /> <a href={`tel:${co.phone}`} className="contact-link" onClick={e => e.stopPropagation()}>{co.phone}</a></span>}
+                        {co.email && <span className="contact-detail"><Mail size={10} /> <a href={`mailto:${co.email}`} className="contact-link" onClick={e => e.stopPropagation()}>{co.email}</a></span>}
+                        {co.website && <span className="contact-detail"><Globe size={10} /> <a href={co.website.startsWith("http") ? co.website : `https://${co.website}`} target="_blank" rel="noopener noreferrer" className="contact-link" onClick={e => e.stopPropagation()}>{co.website}</a></span>}
                       </div>
                     )}
                   </div>
