@@ -19,6 +19,7 @@ export interface Company {
   phone?: string;
   email?: string;
   website?: string;
+  address?: string;
   notes?: string;
   createdAt: number;
 }

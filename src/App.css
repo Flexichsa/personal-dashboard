@@ -1072,7 +1072,10 @@
 .company-logo-img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  padding: 3px;
+  background: white;
+  border-radius: var(--radius-sm);
 }
 .company-logo-placeholder {
   width: 36px;
@@ -1156,7 +1159,10 @@
 .company-logo-upload img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  padding: 4px;
+  background: white;
+  border-radius: var(--radius-sm);
 }
 
 /* Select dropdown in forms */

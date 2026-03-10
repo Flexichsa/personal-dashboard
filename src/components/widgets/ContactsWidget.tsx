@@ -130,7 +130,7 @@ function getAvatarColor(name: string) {
 }
 
 const EMPTY_CONTACT = { name: '', email: '', phone: '', companyId: '', tags: '', notes: '', avatar: '' };
-const EMPTY_COMPANY = { name: '', logo: '', phone: '', email: '', website: '', notes: '' };
+const EMPTY_COMPANY = { name: '', logo: '', phone: '', email: '', website: '', address: '', notes: '' };
 
 export default function ContactsWidget() {
   const [contacts, setContacts] = useSupabase<Contact>('contacts', []);
@@ -243,6 +243,7 @@ export default function ContactsWidget() {
       phone: co.phone ?? '',
       email: co.email ?? '',
       website: co.website ?? '',
+      address: co.address ?? '',
       notes: co.notes ?? '',
     });
     setFormMode('company');
@@ -277,6 +278,7 @@ export default function ContactsWidget() {
       phone: companyForm.phone || undefined,
       email: companyForm.email || undefined,
       website: companyForm.website || undefined,
+      address: companyForm.address || undefined,
       notes: companyForm.notes || undefined,
     };
     if (editCompanyId) {
@@ -479,6 +481,11 @@ export default function ContactsWidget() {
                 placeholder="Website"
                 value={companyForm.website}
                 onChange={e => setCompanyForm({ ...companyForm, website: e.target.value })}
+              />
+              <input
+                placeholder="Adresse"
+                value={companyForm.address}
+                onChange={e => setCompanyForm({ ...companyForm, address: e.target.value })}
               />
               <textarea
                 placeholder="Notizen"
