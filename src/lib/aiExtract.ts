@@ -4,7 +4,7 @@
 const LS_AI_KEY = 'dashboard_openai_api_key';
 
 export function getAiApiKey(): string {
-  return localStorage.getItem(LS_AI_KEY) ?? '';
+  return localStorage.getItem(LS_AI_KEY) ?? import.meta.env.VITE_OPENAI_API_KEY ?? '';
 }
 
 export function saveAiApiKey(key: string): void {
