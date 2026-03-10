@@ -4,7 +4,7 @@ import type { ResponsiveLayouts, Layout } from 'react-grid-layout';
 import {
   Lock, Users, FileText, Bookmark, Calendar, CheckSquare,
   Cloud, Clock, StickyNote, FolderOpen, Timer, Quote, Wallet, Cpu, ClipboardList,
-  TrendingUp, BarChart2, Newspaper, Music,
+  TrendingUp, BarChart2, Newspaper, Music, Monitor,
   Plus, LayoutGrid, LogOut, Upload, Search, Sun, Moon, RotateCcw
 } from 'lucide-react';
 import 'react-grid-layout/css/styles.css';
@@ -30,6 +30,7 @@ import CryptoWidget from './components/widgets/CryptoWidget';
 import StocksWidget from './components/widgets/StocksWidget';
 import NewsWidget from './components/widgets/NewsWidget';
 import FocusMusicWidget from './components/widgets/FocusMusicWidget';
+import MacDashboardWidget from './components/widgets/MacDashboardWidget';
 
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { usePages } from './hooks/usePages';
@@ -71,9 +72,10 @@ const WIDGET_DEFS: WidgetDef[] = [
   { id: 'stocks', label: 'Aktien', category: 'Finanzen', icon: <BarChart2 size={14} />, color: '#34d399', component: <StocksWidget />, defaultW: 3, defaultH: 5, minW: 2, minH: 3 },
   { id: 'news', label: 'News', category: 'Medien', icon: <Newspaper size={14} />, color: '#60a5fa', component: <NewsWidget />, defaultW: 4, defaultH: 6, minW: 2, minH: 3 },
   { id: 'music', label: 'Focus Music', category: 'Medien', icon: <Music size={14} />, color: '#ec4899', component: <FocusMusicWidget />, defaultW: 3, defaultH: 5, minW: 2, minH: 3 },
+  { id: 'macdashboard', label: 'Mac Dashboard', category: 'System', icon: <Monitor size={14} />, color: '#22d3ee', component: <MacDashboardWidget />, defaultW: 12, defaultH: 10, minW: 6, minH: 5 },
 ];
 
-const CATEGORIES = ['Produktivität', 'Organisation', 'Tools', 'Sicherheit', 'Finanzen', 'Medien'];
+const CATEGORIES = ['Produktivität', 'Organisation', 'Tools', 'Sicherheit', 'Finanzen', 'Medien', 'System'];
 
 interface LayoutItem {
   i: string;
@@ -231,6 +233,12 @@ const DEFAULT_PAGES: DashboardPage[] = [
     name: 'Privat',
     visibleWidgets: ['finance', 'contacts', 'stickynotes', 'bookmarks', 'clocks', 'weather'],
     layouts: generateDefaultLayouts(['finance', 'contacts', 'stickynotes', 'bookmarks', 'clocks', 'weather']),
+  },
+  {
+    id: 'system',
+    name: 'System',
+    visibleWidgets: ['macdashboard'],
+    layouts: generateDefaultLayouts(['macdashboard']),
   },
 ];
 

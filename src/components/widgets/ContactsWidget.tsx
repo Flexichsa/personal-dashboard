@@ -526,7 +526,7 @@ export default function ContactsWidget() {
         <div className="vault-toolbar">
           <div className="search-box">
             <Search size={14} />
-            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Name, E-Mail, Tag…" />
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Name, E-Mail, Tag…" autoComplete="off" />
             {search && (
               <button className="search-clear" onClick={() => setSearch('')} aria-label="Suche löschen">
                 <X size={12} />
@@ -678,27 +678,27 @@ export default function ContactsWidget() {
             <div className="vault-form">
               <div className="form-group">
                 <span className="form-group-label">Person <span className="required">*</span></span>
-                <input placeholder="Vor- und Nachname" value={contactForm.name} onChange={e => setContactForm({ ...contactForm, name: e.target.value })} />
+                <input placeholder="Vor- und Nachname" value={contactForm.name} onChange={e => setContactForm({ ...contactForm, name: e.target.value })} autoComplete="off" />
                 <div className="form-group-row">
                   <select value={contactForm.companyId} onChange={e => setContactForm({ ...contactForm, companyId: e.target.value })} className="vault-select">
                     <option value="">— Ohne Firma —</option>
                     {sortedCompanyList.map(co => <option key={co.id} value={co.id}>{co.name}</option>)}
                   </select>
-                  <input placeholder="Position / Rolle" value={contactForm.position} onChange={e => setContactForm({ ...contactForm, position: e.target.value })} />
+                  <input placeholder="Position / Rolle" value={contactForm.position} onChange={e => setContactForm({ ...contactForm, position: e.target.value })} autoComplete="off" />
                 </div>
               </div>
               <div className="form-divider" />
               <div className="form-group">
                 <span className="form-group-label">Kontaktdaten</span>
                 <div className="form-group-row">
-                  <input placeholder="E-Mail" type="email" value={contactForm.email} onChange={e => setContactForm({ ...contactForm, email: e.target.value })} />
-                  <input placeholder="Telefon" type="tel" value={contactForm.phone} onChange={e => setContactForm({ ...contactForm, phone: e.target.value })} />
+                  <input placeholder="E-Mail" type="email" value={contactForm.email} onChange={e => setContactForm({ ...contactForm, email: e.target.value })} autoComplete="off" />
+                  <input placeholder="Telefon" type="tel" value={contactForm.phone} onChange={e => setContactForm({ ...contactForm, phone: e.target.value })} autoComplete="off" />
                 </div>
               </div>
               <div className="form-divider" />
               <div className="form-group">
                 <span className="form-group-label">Zusätzlich</span>
-                <input placeholder="Tags (kommagetrennt)" value={contactForm.tags} onChange={e => setContactForm({ ...contactForm, tags: e.target.value })} />
+                <input placeholder="Tags (kommagetrennt)" value={contactForm.tags} onChange={e => setContactForm({ ...contactForm, tags: e.target.value })} autoComplete="off" />
                 <textarea
                   placeholder="Notizen"
                   value={contactForm.notes}
