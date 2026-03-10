@@ -526,10 +526,15 @@ export default function ContactsWidget() {
         <div className="vault-toolbar">
           <div className="search-box">
             <Search size={14} />
-            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Suchen…" />
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Name, E-Mail, Tag…" />
+            {search && (
+              <button className="search-clear" onClick={() => setSearch('')} aria-label="Suche löschen">
+                <X size={12} />
+              </button>
+            )}
           </div>
-          <button className="btn-icon" onClick={openNewCompany} title="Neue Firma"><Building size={15} /></button>
-          <button className="btn-icon" onClick={() => openNewContact()} title="Neuer Kontakt"><Plus size={16} /></button>
+          <button className="btn-secondary btn-sm" onClick={openNewCompany}><Building size={13} /> Firma</button>
+          <button className="btn-primary btn-sm" onClick={() => openNewContact()}><Plus size={14} /> Kontakt</button>
         </div>
 
         {/* === FIRMA FORM === */}
@@ -671,22 +676,37 @@ export default function ContactsWidget() {
             )}
 
             <div className="vault-form">
-              <input placeholder="Name *" value={contactForm.name} onChange={e => setContactForm({ ...contactForm, name: e.target.value })} />
-              <select value={contactForm.companyId} onChange={e => setContactForm({ ...contactForm, companyId: e.target.value })} className="vault-select">
-                <option value="">— Ohne Firma —</option>
-                {sortedCompanyList.map(co => <option key={co.id} value={co.id}>{co.name}</option>)}
-              </select>
-              <input placeholder="Position / Stelle (z.B. CEO, Vertrieb…)" value={contactForm.position} onChange={e => setContactForm({ ...contactForm, position: e.target.value })} />
-              <input placeholder="E-Mail" value={contactForm.email} onChange={e => setContactForm({ ...contactForm, email: e.target.value })} />
-              <input placeholder="Telefon" value={contactForm.phone} onChange={e => setContactForm({ ...contactForm, phone: e.target.value })} />
-              <input placeholder="Tags (kommagetrennt)" value={contactForm.tags} onChange={e => setContactForm({ ...contactForm, tags: e.target.value })} />
-              <textarea
-                placeholder="Notizen"
-                value={contactForm.notes}
-                onChange={e => setContactForm({ ...contactForm, notes: e.target.value })}
-                rows={3}
-                style={{ resize: 'vertical', fontFamily: 'inherit', fontSize: '12px' }}
-              />
+              <div className="form-group">
+                <span className="form-group-label">Person <span className="required">*</span></span>
+                <input placeholder="Vor- und Nachname" value={contactForm.name} onChange={e => setContactForm({ ...contactForm, name: e.target.value })} />
+                <div className="form-group-row">
+                  <select value={contactForm.companyId} onChange={e => setContactForm({ ...contactForm, companyId: e.target.value })} className="vault-select">
+                    <option value="">— Ohne Firma —</option>
+                    {sortedCompanyList.map(co => <option key={co.id} value={co.id}>{co.name}</option>)}
+                  </select>
+                  <input placeholder="Position / Rolle" value={contactForm.position} onChange={e => setContactForm({ ...contactForm, position: e.target.value })} />
+                </div>
+              </div>
+              <div className="form-divider" />
+              <div className="form-group">
+                <span className="form-group-label">Kontaktdaten</span>
+                <div className="form-group-row">
+                  <input placeholder="E-Mail" type="email" value={contactForm.email} onChange={e => setContactForm({ ...contactForm, email: e.target.value })} />
+                  <input placeholder="Telefon" type="tel" value={contactForm.phone} onChange={e => setContactForm({ ...contactForm, phone: e.target.value })} />
+                </div>
+              </div>
+              <div className="form-divider" />
+              <div className="form-group">
+                <span className="form-group-label">Zusätzlich</span>
+                <input placeholder="Tags (kommagetrennt)" value={contactForm.tags} onChange={e => setContactForm({ ...contactForm, tags: e.target.value })} />
+                <textarea
+                  placeholder="Notizen"
+                  value={contactForm.notes}
+                  onChange={e => setContactForm({ ...contactForm, notes: e.target.value })}
+                  rows={2}
+                  style={{ resize: 'vertical', fontFamily: 'inherit', fontSize: '12px' }}
+                />
+              </div>
               <div className="form-actions">
                 <button className="btn-primary" onClick={saveContact}><Check size={14} /> Speichern</button>
                 <button className="btn-secondary" onClick={() => setFormMode('none')}>Abbrechen</button>
@@ -743,17 +763,18 @@ export default function ContactsWidget() {
                     )}
                   </div>
                   <span className="contact-group-count">{members.length}</span>
-                  <button className="btn-icon-sm" onClick={() => openNewContact(co.id)} title="Person hinzufügen"><Plus size={13} /></button>
-                  <button className="btn-icon-sm" onClick={() => openEditCompany(co)} title="Firma bearbeiten"><Pencil size={12} /></button>
-                  {isConfirmDelete ? (
-                    <div className="contact-confirm-delete">
-                      <span>Löschen?</span>
-                      <button className="btn-confirm-yes" onClick={() => deleteCompany(co.id)}>Ja</button>
-                      <button className="btn-confirm-no" onClick={() => setConfirmDeleteCompany(null)}>Nein</button>
-                    </div>
-                  ) : (
-                    <button className="btn-icon-sm" onClick={() => setConfirmDeleteCompany(co.id)}><Trash2 size={12} /></button>
-                  )}
+                  <div className="company-actions">
+                    <button className="btn-icon-sm" onClick={() => openNewContact(co.id)} title="Person hinzufügen"><Plus size={14} /></button>
+                    <button className="btn-icon-sm" onClick={() => openEditCompany(co)} title="Bearbeiten"><Pencil size={13} /></button>
+                    {isConfirmDelete ? (
+                      <div className="contact-confirm-delete">
+                        <button className="btn-confirm-yes" onClick={() => deleteCompany(co.id)}>Ja</button>
+                        <button className="btn-confirm-no" onClick={() => setConfirmDeleteCompany(null)}>Nein</button>
+                      </div>
+                    ) : (
+                      <button className="btn-icon-sm" onClick={() => setConfirmDeleteCompany(co.id)} title="Löschen"><Trash2 size={13} /></button>
+                    )}
+                  </div>
                 </div>
                 {!isCollapsed && members.length > 0 && (
                   <div className="company-members">{members.map(c => renderContactCard(c, true))}</div>
@@ -782,7 +803,27 @@ export default function ContactsWidget() {
             </div>
           )}
 
-          {isEmpty && <p className="empty-text">{search ? 'Keine Treffer' : 'Noch keine Kontakte'}</p>}
+          {isEmpty && (
+            <div className="contacts-empty-state">
+              <div className="contacts-empty-icon"><Users size={36} /></div>
+              {search ? (
+                <>
+                  <p className="contacts-empty-title">Keine Treffer für „{search}"</p>
+                  <p className="contacts-empty-hint">Anderen Suchbegriff versuchen oder Suche löschen.</p>
+                  <button className="btn-secondary btn-sm" onClick={() => setSearch('')}><X size={12} /> Suche löschen</button>
+                </>
+              ) : (
+                <>
+                  <p className="contacts-empty-title">Noch keine Kontakte</p>
+                  <p className="contacts-empty-hint">Lege zuerst eine Firma an, dann füge Personen hinzu.</p>
+                  <div className="contacts-empty-actions">
+                    <button className="btn-secondary btn-sm" onClick={openNewCompany}><Building size={13} /> Firma anlegen</button>
+                    <button className="btn-primary btn-sm" onClick={() => openNewContact()}><Plus size={13} /> Person anlegen</button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </WidgetWrapper>
