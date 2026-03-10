@@ -1,7 +1,7 @@
-// AI-gestützte Feldextraktion via Claude API (direkt vom Browser)
+// KI-Feldextraktion via OpenAI API (direkt vom Browser)
 // API-Key wird im localStorage gespeichert, nie committet.
 
-const LS_AI_KEY = 'dashboard_ai_api_key';
+const LS_AI_KEY = 'dashboard_openai_api_key';
 
 export function getAiApiKey(): string {
   return localStorage.getItem(LS_AI_KEY) ?? '';
@@ -26,20 +26,17 @@ export interface CompanyExtract {
   address?: string;
 }
 
-async function callClaude(
-  apiKey: string,
-  content: unknown,
-): Promise<string> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+type MessageContent = string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+
+async function callOpenAI(apiKey: string, content: MessageContent): Promise<string> {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
+      'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
+      model: Array.isArray(content) ? 'gpt-4o-mini' : 'gpt-4o-mini',
       max_tokens: 512,
       messages: [{ role: 'user', content }],
     }),
@@ -50,8 +47,8 @@ async function callClaude(
     throw new Error(err?.error?.message ?? `API-Fehler ${res.status}`);
   }
 
-  const data = await res.json() as { content?: Array<{ text?: string }> };
-  return data.content?.[0]?.text ?? '';
+  const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
+  return data.choices?.[0]?.message?.content ?? '';
 }
 
 function parseJson<T>(text: string): T | null {
@@ -76,7 +73,7 @@ ${text}
 
 Nur JSON zurückgeben, keine Erklärung.`;
 
-  const reply = await callClaude(apiKey, prompt);
+  const reply = await callOpenAI(apiKey, prompt);
   return parseJson<ContactExtract>(reply) ?? {};
 }
 
@@ -87,14 +84,17 @@ export async function extractContactFromImage(
   apiKey: string,
 ): Promise<ContactExtract> {
   const content = [
-    { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
+    {
+      type: 'image_url',
+      image_url: { url: `data:${mimeType};base64,${base64}` },
+    },
     {
       type: 'text',
       text: 'Extrahiere Kontaktdaten aus diesem Bild (Visitenkarte, E-Mail-Signatur, etc.). Antworte NUR mit einem JSON-Objekt mit diesen optionalen Feldern: name, email, phone, company. Nur Felder die eindeutig sichtbar sind. Nur JSON zurückgeben.',
     },
   ];
 
-  const reply = await callClaude(apiKey, content);
+  const reply = await callOpenAI(apiKey, content);
   return parseJson<ContactExtract>(reply) ?? {};
 }
 
@@ -110,7 +110,7 @@ ${text}
 
 Nur JSON zurückgeben, keine Erklärung.`;
 
-  const reply = await callClaude(apiKey, prompt);
+  const reply = await callOpenAI(apiKey, prompt);
   return parseJson<CompanyExtract>(reply) ?? {};
 }
 
@@ -121,13 +121,16 @@ export async function extractCompanyFromImage(
   apiKey: string,
 ): Promise<CompanyExtract> {
   const content = [
-    { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
+    {
+      type: 'image_url',
+      image_url: { url: `data:${mimeType};base64,${base64}` },
+    },
     {
       type: 'text',
       text: 'Extrahiere Firmendaten aus diesem Bild (Briefkopf, Visitenkarte, Website-Screenshot, etc.). Antworte NUR mit einem JSON-Objekt mit diesen optionalen Feldern: name, phone, email, website, address. Nur Felder die eindeutig sichtbar sind. Nur JSON zurückgeben.',
     },
   ];
 
-  const reply = await callClaude(apiKey, content);
+  const reply = await callOpenAI(apiKey, content);
   return parseJson<CompanyExtract>(reply) ?? {};
 }

@@ -427,7 +427,7 @@ export default function ContactsWidget() {
         <div className="smart-fill-apikey">
           <input
             type="password"
-            placeholder="Anthropic API Key (sk-ant-…)"
+            placeholder="OpenAI API Key (sk-…)"
             value={apiKeyInput}
             onChange={e => setApiKeyInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSaveApiKey()}
