@@ -776,13 +776,13 @@ export default function ContactsWidget() {
                   <button className="company-collapse-btn" onClick={() => toggleCollapse(co.id)}>
                     {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
                   </button>
-                  <div className="company-logo-display" onClick={() => openEditCompany(co)}>
+                  <div className="company-logo-display" onClick={() => toggleCollapse(co.id)}>
                     {co.logo
                       ? <img src={co.logo} alt={co.name} className="company-logo-img" />
                       : <div className="company-logo-placeholder" style={{ background: getAvatarColor(co.name) }}>{getInitials(co.name)}</div>
                     }
                   </div>
-                  <div className="company-info" onClick={() => openEditCompany(co)}>
+                  <div className="company-info" onClick={() => toggleCollapse(co.id)}>
                     <span className="company-name">{co.name}</span>
                     {(co.phone || co.email || co.website) && (
                       <div className="company-details">
