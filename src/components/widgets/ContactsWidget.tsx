@@ -739,7 +739,7 @@ export default function ContactsWidget() {
         <div className="contact-list">
           {sortedCompanies.map(co => {
             const members = contactsByCompany.get(co.id) ?? [];
-            const isCollapsed = collapsed.has(co.id);
+            const isCollapsed = search ? false : collapsed.has(co.id);
             const isConfirmDelete = confirmDeleteCompany === co.id;
             return (
               <div key={co.id} className="company-block">
@@ -798,7 +798,7 @@ export default function ContactsWidget() {
                 <span className="contact-group-name">Ohne Firma</span>
                 <span className="contact-group-count">{unlinkedContacts.length}</span>
               </button>
-              {!collapsed.has('__unlinked__') && (
+              {!(search ? false : collapsed.has('__unlinked__')) && (
                 <div className="company-members">{unlinkedContacts.map(c => renderContactCard(c, false))}</div>
               )}
             </div>
