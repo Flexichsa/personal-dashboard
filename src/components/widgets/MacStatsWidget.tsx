@@ -97,14 +97,11 @@ export default function MacStatsWidget() {
     }
   }, []);
 
-  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
   useEffect(() => {
-    if (!isLocal) return;
     fetch_();
     const t = setInterval(fetch_, REFRESH_MS);
     return () => clearInterval(t);
-  }, [fetch_, isLocal]);
+  }, [fetch_]);
 
   const cpuColor = stats ? (stats.cpu > 80 ? 'var(--danger)' : stats.cpu > 50 ? 'var(--warning)' : '#7c3aed') : '#7c3aed';
   const ramColor = stats ? (stats.ramPct > 85 ? 'var(--danger)' : stats.ramPct > 65 ? 'var(--warning)' : 'var(--accent-secondary)') : 'var(--accent-secondary)';
@@ -113,28 +110,21 @@ export default function MacStatsWidget() {
     <WidgetWrapper widgetId="macstats" title="Mac Stats" icon={<Monitor size={16} />}>
       <div className="macstats-widget">
 
-        {!isLocal && (
-          <div className="macstats-connecting">
-            <Monitor size={18} style={{ opacity: 0.4 }} />
-            <span>Mac Stats ist nur lokal verfügbar.<br />Öffne <strong>localhost:5173</strong> auf deinem Mac.</span>
-          </div>
-        )}
-
-        {isLocal && status === 'loading' && (
+        {status === 'loading' && (
           <div className="macstats-connecting">
             <RefreshCw size={18} className="spin" />
             <span>Verbinde mit localhost:7777…</span>
           </div>
         )}
 
-        {isLocal && status === 'error' && (
+        {status === 'error' && (
           <div className="macstats-connecting macstats-error">
             <AlertCircle size={18} />
             <span>Server nicht erreichbar — <code>node projekte/mac-dashboard/src/server.js</code></span>
           </div>
         )}
 
-        {isLocal && status === 'ok' && stats && (
+        {status === 'ok' && stats && (
           <>
             {/* CPU + RAM Rings */}
             <div className="macstats-rings">
