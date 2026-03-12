@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Vault Setup</title>
+  <style>
+    body { font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #1a1a2e; color: #eee; }
+    .card { background: #16213e; padding: 2rem; border-radius: 12px; text-align: center; max-width: 420px; }
+    .ok { color: #4ade80; font-size: 3rem; }
+    p { color: #94a3b8; margin: 0.5rem 0; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="ok">✓</div>
+  <h2>Vault wird eingerichtet…</h2>
+  <p id="status">Daten werden geschrieben…</p>
+</div>
+<script>
+  const HASH = 'd81d33b5b49da8cce8ea803d4797bd7d0bda95546b0ec4ab6b8e17f4dcb37e9a';
+  const DATA = 'U2FsdGVkX1/fxpxtdAUAYxf0FBV3KGg1ONN4I/N5UdpOhdL7jwVSw0Y839TEKWXBTqBbGO4i3lpEFZhdIfxHv8tr2aeMyN+QzOKoNUiA9EXe3pexbAuz+kSpQKkn0oq4TpI7WUPLy6SDzJlwcrXCI7xHg8qeazVZJ4MU+KNzWzpq98D5x1GNHo5PBvR64rW/61qSTW0hDIGkDlgMcY6rwPRlu698Ei6I7r7/y2yLRTcjh9PR/NseA62olTwSwtunThntbsw/S3ICqKw7CmJ+N1znzMLqFq8sUpru8CTuIWT7w/vsLM6Euz0dXb3/MSSIgSOmuRutaZgNgTO6GNewLbCkgNhsOkkqA9XgACGohd2aMgqWH6T2JFePgfZQnmaADxbevwnjkfAO8FamUyDW2g8ByN9oW57tFBJE3d8qiZUOvbCuxzUb7twPM7TBjpb/fndaBa4bUWQThxQTVIdqEs1AzWB6EZwIZ3/xjwE/dqltW9kUb/Jh+mFAFcuW+EICF0xoSBicnybT3uYvAx7Ct9shFaqIGvKAvHG0T4hsOkJYNksHW+knkuaOvDL+JgZpq48sPVw1z4SCkbcww4r71B1gitl3DS4e53RVFp3wdQJDw7j12LMhC8hA/zYM57feT8t7DTDVXIKWh0bgS8I2RofDccKK3Aqgh+lvdHWCyc1lj3wCm3JvHYXvkm/GZ+fmE/LLyAmlVPLg/TKxd0ms4FSXTXsQmGCBOtEVAWqKQ9mMeREiCNPLp1eSVZLkbujnmeVAYHPU92gX4QyqKjrS5VzXAljZVRSD4Fy8M+D/6MEOgmdSC4X24BCs+tJs6vxf8mLvkIjwHBVRLq6ygaBO5ySYrOeeUpMZnqlBaM/YPqxGRvkIcb/SDqlbMNvfP7ydRAH6ZwVNRQpnHW4vHq0Zt4kTEIOrU9+k0UPxkqvGL4ASvYSsvhHKHwKgpz0r0yTZ/SRGAxiIYXhhAOwOe2gLZqnCuY099gX+rXCqodQaPrmwGvd1xHzayjsr/cRRpxOS5P0fBu9OMFwH8+tQdIEuyTL2vVOlJN44yA9X6T6Iphc60pzgifqQRE7jeeX2AuLJDmN44bWxKwF9R/V1q9AWkNjlxJLATMbk2EoSdqnr/9F/KtKTa7Xrnv1bW+fIq8Rs4JS18en103jhp3jip1D81E1Z6uUGNDyc462LjCipPB5HOmdXGneMFZyRLpbd91grul9XuYg5H9xMGb9xp1uZZmUMYaZ7t51quBjE+Tr9sDRxQ/QqzwNdPEWGIjUnwcMUCdNlVaqvgQfb0RqUbl5kbP3GUYM6btaxnmq71+QDmWVZqAC9vleTUNJBtCKYa+f4i4bzGGPPGk9PkcFiEebO+mqwLfciBxJCpuYfqQYk3KWm60pp0IVpct/4Ax7UUuQPV6PUeDEUVOREGHhxH7ikMUcQZ56OVOKRAXR3nkPiKhx0VFkcwMeREQ2VsPlgDr2NT9NeBcUbzRmxWY/LYPmed8gSnhBCaSFbbXWSyTFI/Rn0XfRDetD8RKEvfWRiJmGhfJ62Afi+D02iw9f22Lr4wcUXhfufZ7TUqHOoOnwDa/1civLZutJ3mrVO6Z4ENth9tljbW2zjr3UUTa4q6Ky/o9hFflIoswR7yZ/p4sGjnin/piFoSOlzlO3URcWItJIOkQONRwnUaV0dCVCH+rX8qDxf1B2/0Ts0zguF3ScxQAjuIcJ15IB85KaLuZtHxeUo71r8mTMsyGpHkzvZw88kQ/p8M0K588rqFeFZs9wqz2ispzXxj4njMvvW4sng9/OEbpoVHto8h+CIodvbxBbnFjMbNN9kzsFKcXq/uIiARtkoRHXhuMZX854xVOTM4ur9bjV2O/FisSiAJVYD3hUVQB8NzQnsyEqWZ4caA+77dk5mojoE7wCa4jbF2MR7fJV7SVNrHQbeZkq0L0iLJsdu0d8TVF22IFC6jF3u4P4i5pdHrDWhbjQd79IXULCjB0qajjFfQJ2mtKI+gadBemvBc2bjPJMNh+Bhtb3m2R2pRUhtmXr+ehmY28+oDtmo73rME3HIl2kKxSaxhXkUr61VBEdSrQh8FAJ/0y6CTlC+5ohoy+o++LpaQUIDfuFosCq+BZBoXJu6Kl03zI92KW5IRJRMJZJj+o0Xu65sSk2rm1x058KCZEP04C6DV5ts+465CRNdTCAxlWLQOPrxV9Kj4QsjVCnqYe8+V2HLvxsN6z0r1UWLLAr/uHGqaxE8hTvvI5vqVDucA6m7aDPPkBtcI7L9E6+PhM9agM7xyaCJUOPOwtRk774QGPi4uOUrk3/wCObRCwLYuFSXUn49zzBkpLED4jMea+Fqx/j5DzWb1D8X6A0Y7llgw3eNPd5MH7VYtc0TTwRXfinQ2FI72esUTl7/GyDZ2D/O5dNr3uhRYNFnCA7Exib59VRup/WHVhb+dwGhSjUssr6TXblZQUXfghyfD0fI33KnHnqMc+CxchydSUyh4M0MbCrZwS/njmoFYdGiWVH005SJiA6FHOoJbpSjqUDX6KuuFzLhogF6zO01Lcrb4KhkvREjGuMSLRethyFpxbwSFAMewCleCYc6xmD7xNKhYbpeGS4DZkINDCIKwmog2vlSbev6PboLxkILFdYxnvSDvh67p9mpsDq//0JZPcWQFWbxV8KgLeTDLRpsZxzuiyTowuysnBW29GvI6oiSXaIDDqkfDPp7OheUXwMfnCRkShkev6pF7/vIoWcx2hh3ZupZKtwi3OPG8QfKhHA2xoMHmCmryaqPsRv/IeBDpFqsBtEVkzhjnJhL8GU92KnoAqGBx7B/IRpM/b0W64AXJ7qsQlEsuQtbxyiSIGU4xPcSDhldCAlscWp3xcKLkj0P9XKXpgJ5hwFdEiOAX7UjhhKy+Z4Cz/strUECKMLsuf6QdMkiOa4ekbq0VqCU3foJbbKMqSn3XbUsivzoLDkSMrb9OrC58G9fNkwhxsBEzkI9O0zNMyN/43XartXTaEKB9iNsLQVvtCEU8/IecW8eDE1d3VxldOF6sQ0a5BcRXEO4JHvP6P1LrShwb9CYYS+PbNFtn4VEKJhtwCCwvQtMs/Fjx80IbJrvKz3L80S/VPYWmS+KCAk8V1UyotzxNrbTDz6Txf89mxNF1rzHBkAjPt5WytNcGBeep/fZ6YCFiSX65VdURPiTef4C9QNJs0LRqBEOYG61sk7v9gI842ZV9umFeePPiPQU0DSwb5++ddi6SCgSUYvGU5CApF2HcPxHAN9N31M7tw4IQ8RNDOWVIdQL5blO+4rYIETYZy+cUxXxHCHrbvjAfeGuWpEjeOG/L358n9M/mJJ8zvh0A4pXPeuVzAGTYlD7JCvpBYldq4RdK4xEu7FLZG0bIEn09zgC5DDYPiaCHmYWwuQAH5GjZ+SeICiHhrqZ+hhq1K5AaA7fx7HtryqU/MlK5XQhzlC7S0fHIBAqV6o/+Zu6GIeuikvwQyYX35Q8p+rCD0aS4HXAX8pVefvSFXEFxSsuvFDrN+ejmJ6dqbHhjoVqc9nz0nXIOBo0pK2WYhShTL51kDrAQbJG0BIQFtdvMXKdM8vEOAeAI1BvX9BbzNtgEq3PTb6xm+0CUzcNzW/6xCWdfHUxLGcIRoOkmq1GWRx8Pv/1mrwTBjcc16P8Cmcrjf0DkTb3kHeUg+LYx7AXz21Sh7a2A3BQzyl2rL0XJ5bAMyD7QFjsoJXYXl11UaAgOrEDlrcN2j4ACTM+I59+JPnHGW4EOiPvfu0u3l4R6ayswrWFCwtYj7jUqxxnVkZIYtZUenwYNP//XNPxSFSIIfu1nIPKnawNbmE14N3fOy5iHf31Jf93U9XQkhcVg9Pzd+ByDINcgiMrdRJtutvNXSA030MC9J3jYjgXu4/QNTi1ZinJ53xM7u/IgWazK874u6Qq+ykGsoydpY4Bulm81KURcMWPb8NDUGw6WWv67oGV8Ir2cPkzato2dw8GyWiDemwG+oYgdH81k6wXbMnPUMGjjpCb/eH6XaomsXvfEjg4rKmKSZjJwne/YrCOpMd/';
+
+  try {
+    localStorage.setItem('dashboard_vault_hash', HASH);
+    localStorage.setItem('dashboard_vault_data', DATA);
+    document.getElementById('status').textContent = '8 Einträge gespeichert — Weiterleitung…';
+    setTimeout(() => { window.location.href = '/'; }, 1500);
+  } catch(e) {
+    document.getElementById('status').textContent = 'Fehler: ' + e.message;
+  }
+</script>
+</body>
+</html>
