@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Vault Setup</title>
+  <style>
+    body { font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #1a1a2e; color: #eee; }
+    .card { background: #16213e; padding: 2rem; border-radius: 12px; text-align: center; max-width: 420px; }
+    .ok { color: #4ade80; font-size: 3rem; }
+    p { color: #94a3b8; margin: 0.5rem 0; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="ok">✓</div>
+  <h2>Vault wird eingerichtet…</h2>
+  <p id="status">Daten werden geschrieben…</p>
+</div>
+<script>
+  const HASH = '287182e1920fcd8548246f3fbd72324fc956208de37a027b29a7dd397f651c3a';
+  const DATA = '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';
+
+  try {
+    localStorage.setItem('dashboard_vault_hash', HASH);
+    localStorage.setItem('dashboard_vault_data', DATA);
+    document.getElementById('status').innerHTML = '8 Eintr&auml;ge gespeichert &mdash; Weiterleitung&hellip;';
+    setTimeout(() => { window.location.href = '/'; }, 1500);
+  } catch(e) {
+    document.getElementById('status').textContent = 'Fehler: ' + e.message;
+  }
+</script>
+</body>
+</html>
