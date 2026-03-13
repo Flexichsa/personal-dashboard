@@ -13,36 +13,66 @@ interface StockData {
 
 const DEFAULT_SYMBOLS = ['AAPL', 'MSFT', 'NVDA', 'SAP.DE'];
 
-async function parseYahooResponse(json: unknown, symbol: string): Promise<StockData | null> {
-  const meta = (json as { chart?: { result?: Array<{ meta?: { regularMarketPrice?: number; previousClose?: number; chartPreviousClose?: number; currency?: string } }> } })?.chart?.result?.[0]?.meta;
-  if (!meta) return null;
-  const price: number = meta.regularMarketPrice ?? 0;
-  const prev: number = meta.previousClose ?? meta.chartPreviousClose ?? price;
-  const change = price - prev;
-  const changePercent = prev !== 0 ? (change / prev) * 100 : 0;
-  return { symbol, price, change, changePercent, currency: meta.currency ?? '' };
+// AAPL → AAPL.US (US-Börse als Default); SAP.DE bleibt SAP.DE
+function toStooqSymbol(symbol: string): string {
+  const s = symbol.toUpperCase();
+  if (s.includes('.')) return s;
+  return s + '.US';
+}
+
+function currencyFromSymbol(stooqSym: string): string {
+  if (stooqSym.endsWith('.DE') || stooqSym.endsWith('.AT') || stooqSym.endsWith('.PA')) return 'EUR';
+  if (stooqSym.endsWith('.SW') || stooqSym.endsWith('.VX')) return 'CHF';
+  if (stooqSym.endsWith('.L') || stooqSym.endsWith('.UK')) return 'GBP';
+  return 'USD';
+}
+
+function parseStooqCSV(csv: string, symbol: string, stooqSym: string): StockData | null {
+  // CSV-Format: Date,Open,High,Low,Close,Volume
+  const lines = csv.trim().split('\n').filter(l => l && !l.startsWith('Date') && !l.startsWith('No data'));
+  if (lines.length < 1) return null;
+
+  // Letzte Zeile = aktuellster Handelstag
+  const lastRow = lines[lines.length - 1].split(',');
+  const prevRow = lines.length >= 2 ? lines[lines.length - 2].split(',') : null;
+
+  const price = parseFloat(lastRow[4]);   // Close
+  const prevClose = prevRow ? parseFloat(prevRow[4]) : parseFloat(lastRow[1]); // Vortages-Close oder Open
+
+  if (isNaN(price) || price === 0) return null;
+
+  const change = price - prevClose;
+  const changePercent = prevClose !== 0 ? (change / prevClose) * 100 : 0;
+
+  return { symbol, price, change, changePercent, currency: currencyFromSymbol(stooqSym) };
 }
 
 async function fetchStock(symbol: string): Promise<StockData | null> {
-  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2d`;
+  const stooqSym = toStooqSymbol(symbol);
 
-  // Direktversuch
+  // Letzten 14 Tage → sicher 2+ Handelstage abgedeckt
+  const d2 = new Date();
+  const d1 = new Date(d2.getTime() - 14 * 24 * 60 * 60 * 1000);
+  const fmt = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, '');
+  const stooqUrl = `https://stooq.com/q/d/l/?s=${encodeURIComponent(stooqSym)}&d1=${fmt(d1)}&d2=${fmt(d2)}&i=d`;
+
+  // Direktversuch (Stooq erlaubt häufig Cross-Origin)
   try {
-    const res = await fetch(yahooUrl, { signal: AbortSignal.timeout(8000) });
+    const res = await fetch(stooqUrl, { signal: AbortSignal.timeout(8000) });
     if (res.ok) {
-      const json = await res.json();
-      const result = await parseYahooResponse(json, symbol);
+      const text = await res.text();
+      const result = parseStooqCSV(text, symbol, stooqSym);
       if (result) return result;
     }
-  } catch { /* CORS oder Timeout → Proxy versuchen */ }
+  } catch { /* CORS oder Timeout → Proxy */ }
 
   // CORS-Proxy-Fallback
   try {
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`;
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(stooqUrl)}`;
     const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(12000) });
     if (!res.ok) return null;
-    const json = await res.json();
-    return parseYahooResponse(json, symbol);
+    const text = await res.text();
+    return parseStooqCSV(text, symbol, stooqSym);
   } catch {
     return null;
   }
@@ -52,7 +82,7 @@ export default function StocksWidget() {
   const [symbols, setSymbols] = useLocalStorage<string[]>('stocks-symbols', DEFAULT_SYMBOLS);
   const [data, setData] = useState<Record<string, StockData>>({});
   const [loading, setLoading] = useState(false);
-  const [corsError, setCorsError] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
   const [newSymbol, setNewSymbol] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [lastUpdated, setLastUpdated] = useState('');
@@ -60,7 +90,7 @@ export default function StocksWidget() {
   const fetchAll = useCallback(async () => {
     if (symbols.length === 0) return;
     setLoading(true);
-    setCorsError(false);
+    setFetchError(false);
     const results: Record<string, StockData> = {};
     let anySuccess = false;
 
@@ -71,7 +101,7 @@ export default function StocksWidget() {
       })
     );
 
-    if (!anySuccess && symbols.length > 0) setCorsError(true);
+    if (!anySuccess && symbols.length > 0) setFetchError(true);
 
     setData(results);
     setLastUpdated(new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }));
@@ -97,7 +127,7 @@ export default function StocksWidget() {
   };
 
   const fmtPrice = (price: number, currency: string) => {
-    const prefix = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : (currency ? currency + ' ' : '');
+    const prefix = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : currency === 'CHF' ? 'CHF ' : (currency ? currency + ' ' : '');
     return `${prefix}${price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
@@ -105,7 +135,7 @@ export default function StocksWidget() {
     <WidgetWrapper widgetId="stocks" title="Aktien" icon={<BarChart2 size={16} />}>
       <div className="stocks-widget">
         <div className="stocks-toolbar">
-          <span className="stocks-source">Yahoo Finance</span>
+          <span className="stocks-source">Stooq</span>
           <div className="crypto-toolbar-right">
             {lastUpdated && <span className="crypto-timestamp">{lastUpdated}</span>}
             <button className="btn-icon" onClick={fetchAll} disabled={loading} title="Aktualisieren">
@@ -120,7 +150,7 @@ export default function StocksWidget() {
         {showAdd && (
           <div className="crypto-add-row">
             <input
-              placeholder="Symbol (z.B. AAPL, SAP.DE, BTC-EUR)"
+              placeholder="AAPL · MSFT · SAP.DE · NESN.SW"
               value={newSymbol}
               onChange={e => setNewSymbol(e.target.value)}
               onKeyDown={e => {
@@ -133,10 +163,10 @@ export default function StocksWidget() {
           </div>
         )}
 
-        {corsError && (
+        {fetchError && (
           <div className="stocks-cors-note">
             <span>⚠ Kurse nicht verfügbar</span>
-            <span>Yahoo Finance ist gerade nicht erreichbar. Bitte in einigen Minuten erneut versuchen.</span>
+            <span>Stooq ist gerade nicht erreichbar. Bitte in einigen Minuten erneut versuchen.</span>
           </div>
         )}
 
@@ -160,7 +190,7 @@ export default function StocksWidget() {
                       </span>
                     </>
                   ) : (
-                    <span className="stocks-no-data">–</span>
+                    <span className="stocks-no-data">{loading ? '…' : '–'}</span>
                   )}
                 </div>
                 <button className="btn-icon-sm delete-btn crypto-remove" onClick={() => removeSymbol(sym)}>
