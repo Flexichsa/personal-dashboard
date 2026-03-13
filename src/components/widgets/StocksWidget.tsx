@@ -13,21 +13,36 @@ interface StockData {
 
 const DEFAULT_SYMBOLS = ['AAPL', 'MSFT', 'NVDA', 'SAP.DE'];
 
+async function parseYahooResponse(json: unknown, symbol: string): Promise<StockData | null> {
+  const meta = (json as { chart?: { result?: Array<{ meta?: { regularMarketPrice?: number; previousClose?: number; chartPreviousClose?: number; currency?: string } }> } })?.chart?.result?.[0]?.meta;
+  if (!meta) return null;
+  const price: number = meta.regularMarketPrice ?? 0;
+  const prev: number = meta.previousClose ?? meta.chartPreviousClose ?? price;
+  const change = price - prev;
+  const changePercent = prev !== 0 ? (change / prev) * 100 : 0;
+  return { symbol, price, change, changePercent, currency: meta.currency ?? '' };
+}
+
 async function fetchStock(symbol: string): Promise<StockData | null> {
+  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2d`;
+
+  // Direktversuch
   try {
-    const res = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2d`,
-      { signal: AbortSignal.timeout(8000) }
-    );
+    const res = await fetch(yahooUrl, { signal: AbortSignal.timeout(8000) });
+    if (res.ok) {
+      const json = await res.json();
+      const result = await parseYahooResponse(json, symbol);
+      if (result) return result;
+    }
+  } catch { /* CORS oder Timeout → Proxy versuchen */ }
+
+  // CORS-Proxy-Fallback
+  try {
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`;
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(12000) });
     if (!res.ok) return null;
     const json = await res.json();
-    const meta = json?.chart?.result?.[0]?.meta;
-    if (!meta) return null;
-    const price: number = meta.regularMarketPrice ?? 0;
-    const prev: number = meta.previousClose ?? meta.chartPreviousClose ?? price;
-    const change = price - prev;
-    const changePercent = prev !== 0 ? (change / prev) * 100 : 0;
-    return { symbol, price, change, changePercent, currency: meta.currency ?? '' };
+    return parseYahooResponse(json, symbol);
   } catch {
     return null;
   }
@@ -121,7 +136,7 @@ export default function StocksWidget() {
         {corsError && (
           <div className="stocks-cors-note">
             <span>⚠ Kurse nicht verfügbar</span>
-            <span>Yahoo Finance blockiert direkte Browser-Anfragen (CORS). Verwende eine Browser-Extension wie „CORS Everywhere" oder öffne die App lokal.</span>
+            <span>Yahoo Finance ist gerade nicht erreichbar. Bitte in einigen Minuten erneut versuchen.</span>
           </div>
         )}
 

@@ -110,27 +110,40 @@ export default function CryptoWidget() {
         {error && <div className="crypto-error">{error}</div>}
 
         <div className="crypto-list">
-          {loading && data.length === 0 && (
+          {loading && coins.length === 0 && (
             <div className="crypto-loading">Lade Kurse…</div>
           )}
-          {data.map(coin => (
-            <div key={coin.id} className="crypto-row">
-              <img src={coin.image} alt={coin.symbol} className="crypto-icon" />
-              <div className="crypto-info">
-                <span className="crypto-symbol">{coin.symbol.toUpperCase()}</span>
-                <span className="crypto-name">{coin.name}</span>
+          {coins.map(coinId => {
+            const coin = data.find(c => c.id === coinId);
+            return (
+              <div key={coinId} className="crypto-row">
+                {coin ? (
+                  <img src={coin.image} alt={coin.symbol} className="crypto-icon" />
+                ) : (
+                  <div className="crypto-icon-placeholder" />
+                )}
+                <div className="crypto-info">
+                  <span className="crypto-symbol">{coin ? coin.symbol.toUpperCase() : coinId.toUpperCase()}</span>
+                  <span className="crypto-name">{coin ? coin.name : (loading ? '…' : '–')}</span>
+                </div>
+                <div className="crypto-price-block">
+                  {coin ? (
+                    <>
+                      <span className="crypto-price">{sym}{fmt(coin.current_price)}</span>
+                      <span className={`crypto-change ${coin.price_change_percentage_24h >= 0 ? 'up' : 'down'}`}>
+                        {coin.price_change_percentage_24h >= 0 ? '▲' : '▼'} {Math.abs(coin.price_change_percentage_24h).toFixed(2)}%
+                      </span>
+                    </>
+                  ) : (
+                    <span className="crypto-price" style={{ color: 'var(--text-muted)' }}>–</span>
+                  )}
+                </div>
+                <button className="btn-icon-sm delete-btn crypto-remove" onClick={() => removeCoin(coinId)}>
+                  <X size={11} />
+                </button>
               </div>
-              <div className="crypto-price-block">
-                <span className="crypto-price">{sym}{fmt(coin.current_price)}</span>
-                <span className={`crypto-change ${coin.price_change_percentage_24h >= 0 ? 'up' : 'down'}`}>
-                  {coin.price_change_percentage_24h >= 0 ? '▲' : '▼'} {Math.abs(coin.price_change_percentage_24h).toFixed(2)}%
-                </span>
-              </div>
-              <button className="btn-icon-sm delete-btn crypto-remove" onClick={() => removeCoin(coin.id)}>
-                <X size={11} />
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </WidgetWrapper>

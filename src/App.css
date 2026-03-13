@@ -4230,6 +4230,15 @@
 .crypto-change.up   { color: var(--success); }
 .crypto-change.down { color: var(--danger); }
 
+.crypto-icon-placeholder {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
 .crypto-remove {
   opacity: 0;
   transition: opacity 0.15s;
