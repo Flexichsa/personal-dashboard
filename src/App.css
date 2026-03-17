@@ -4240,12 +4240,13 @@
 }
 
 .crypto-remove {
-  opacity: 0;
+  opacity: 0.30;
   transition: opacity 0.15s;
   flex-shrink: 0;
 }
 
-.crypto-row:hover .crypto-remove {
+.crypto-row:hover .crypto-remove,
+.stocks-row:hover .crypto-remove {
   opacity: 1;
 }
 
