@@ -4750,3 +4750,241 @@
 
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin 1s linear infinite; }
+
+/* ── MacStats: System Info Bar ── */
+.macstats-sysbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  background: var(--widget-bg, rgba(0,0,0,0.04));
+  border-radius: 6px;
+  font-size: 11px;
+}
+.macstats-sysbar-brand {
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.macstats-sysbar-chip {
+  background: #7c3aed22;
+  color: #7c3aed;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.macstats-sysbar-uptime {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+/* ── MacStats: Battery ── */
+.macstats-battery {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+}
+.macstats-battery-icon { display: flex; align-items: center; }
+.macstats-battery-bar-wrap {
+  flex: 1;
+}
+.macstats-battery-bar-bg {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.macstats-battery-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+@keyframes batteryCharge {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.55; }
+  100% { opacity: 1; }
+}
+.macstats-battery-fill.charging {
+  animation: batteryCharge 1.6s ease-in-out infinite;
+}
+.macstats-battery-pct {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 32px;
+  text-align: right;
+}
+.macstats-battery-time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.macstats-battery-charging {
+  font-size: 10px;
+  color: var(--success);
+  font-weight: 600;
+}
+
+/* ── MacStats: Tabs ── */
+.macstats-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--border);
+  border-radius: 7px;
+  padding: 2px;
+}
+.macstats-tab {
+  flex: 1;
+  padding: 3px 0;
+  font-size: 10px;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.macstats-tab.active {
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary);
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.macstats-tab:hover:not(.active) {
+  color: var(--text-secondary);
+}
+
+/* ── MacStats: Disk IO ── */
+.macstats-diskio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 4px;
+  font-size: 11px;
+}
+.macstats-diskio-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.macstats-diskio-arrow {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--border);
+  border-radius: 3px;
+  padding: 0 4px;
+  line-height: 1.5;
+}
+.macstats-diskio-val {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+.macstats-diskio-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+}
+
+/* ── MacStats: Prozess-Zusammenfassung ── */
+.macstats-proc-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ── MacStats: Prozess-Tab ── */
+.macstats-procs {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.macstats-proc-header {
+  display: grid;
+  grid-template-columns: 1fr 90px 90px;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.macstats-proc-row {
+  display: grid;
+  grid-template-columns: 1fr 90px 90px;
+  gap: 4px;
+  align-items: center;
+  padding: 3px 0;
+}
+.macstats-proc-row:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+.macstats-proc-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  overflow: hidden;
+}
+.macstats-proc-name span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.macstats-proc-cpu,
+.macstats-proc-mem {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+.macstats-proc-footer {
+  font-size: 10px;
+  color: var(--text-muted);
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+
+/* ── MacStats: System-Tab ── */
+.macstats-system {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.macstats-sys-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+}
+.macstats-sys-row:last-child { border-bottom: none; }
+.macstats-sys-key {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.macstats-sys-val {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
