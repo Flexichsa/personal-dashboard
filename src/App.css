@@ -5964,4 +5964,74 @@ button:focus:not(:focus-visible) { outline: none; }
 .widget-weather .wx-widget {
   flex: 1;
   border-radius: 0 0 calc(var(--radius-lg) - 2px) calc(var(--radius-lg) - 2px);
+  background: transparent !important;
+}
+
+/* ── Full-bleed atmospheric design: gradient covers entire widget incl. header ── */
+.widget-weather.widget-wrapper {
+  background: var(--wx-bg, linear-gradient(155deg, #162538 0%, #253f5a 55%, #3a5a7a 100%)) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.widget-weather.widget-wrapper::before,
+.widget-weather.widget-wrapper::after {
+  display: none !important;
+}
+.widget-weather .widget-header {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(255,255,255,0.10) !important;
+}
+.widget-weather .widget-title {
+  color: rgba(255,255,255,0.80) !important;
+}
+.widget-weather .widget-title span,
+.widget-weather .widget-title svg {
+  color: rgba(255,255,255,0.80) !important;
+}
+.widget-weather .widget-accent-dot {
+  background: rgba(255,255,255,0.40) !important;
+}
+.widget-weather .widget-close {
+  color: rgba(255,255,255,0.50) !important;
+  border-color: rgba(255,255,255,0.15) !important;
+}
+.widget-weather .widget-close:hover {
+  background: rgba(255,255,255,0.15) !important;
+  color: #fff !important;
+}
+
+/* ── Fog drifting strips ───────────────────────────────────────────────────── */
+.wx-fog-particle {
+  position: absolute;
+  border-radius: 40px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(180, 205, 225, 0.16) 25%,
+    rgba(180, 205, 225, 0.22) 50%,
+    rgba(180, 205, 225, 0.16) 75%,
+    transparent 100%
+  );
+  filter: blur(9px);
+  animation: wx-fog-particle-drift linear infinite;
+}
+@keyframes wx-fog-particle-drift {
+  0%   { transform: translateX(-120%); }
+  100% { transform: translateX(220%); }
+}
+
+/* ── Slow cloud puffs (cloud / partly) ─────────────────────────────────────── */
+.wx-cloud-puff {
+  position: absolute;
+  left: 5%;
+  width: 150px;
+  height: 50px;
+  border-radius: 60px;
+  background: rgba(255, 255, 255, 0.05);
+  filter: blur(14px);
+  animation: wx-cloud-puff-float ease-in-out infinite alternate;
+}
+@keyframes wx-cloud-puff-float {
+  0%   { transform: translateX(0px) scaleX(1);    opacity: 0.30; }
+  100% { transform: translateX(22px) scaleX(1.07); opacity: 0.60; }
 }

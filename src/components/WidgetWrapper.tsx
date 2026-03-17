@@ -6,11 +6,12 @@ interface Props {
   children: React.ReactNode;
   widgetId?: string;
   onRemove?: () => void;
+  style?: React.CSSProperties;
 }
 
-export default function WidgetWrapper({ title, icon, children, widgetId, onRemove }: Props) {
+export default function WidgetWrapper({ title, icon, children, widgetId, onRemove, style }: Props) {
   return (
-    <div className={`widget-wrapper ${widgetId ? `widget-${widgetId}` : ''}`}>
+    <div className={`widget-wrapper ${widgetId ? `widget-${widgetId}` : ''}`} style={style}>
       <div className="widget-header">
         <div className="widget-title">
           <span className="widget-accent-dot" />

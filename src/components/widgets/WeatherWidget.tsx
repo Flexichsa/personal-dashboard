@@ -145,6 +145,42 @@ function Particles({ type }: { type: WxType }) {
       </div>
     );
   }
+  if (type === 'fog') {
+    return (
+      <div className="wx-particles" aria-hidden="true">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div
+            key={i}
+            className="wx-fog-particle"
+            style={{
+              top: `${6 + i * 12}%`,
+              width: `${50 + (i * 19) % 38}%`,
+              height: `${26 + (i % 4) * 9}px`,
+              animationDelay: `${i * 1.15}s`,
+              animationDuration: `${9 + i * 1.4}s`,
+            }}
+          />
+        ))}
+      </div>
+    );
+  }
+  if (type === 'cloud' || type === 'partly') {
+    return (
+      <div className="wx-particles" aria-hidden="true">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div
+            key={i}
+            className="wx-cloud-puff"
+            style={{
+              top: `${8 + i * 16}%`,
+              animationDelay: `${i * 0.85}s`,
+              animationDuration: `${5 + i * 0.9}s`,
+            }}
+          />
+        ))}
+      </div>
+    );
+  }
   return null;
 }
 
@@ -319,8 +355,13 @@ export default function WeatherWidget() {
   const dateStr = `${WDAYS[now.getDay()]}, ${now.getDate()}. ${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
 
   return (
-    <WidgetWrapper widgetId="weather" title="Wetter" icon={<MapPin size={16} />}>
-      <div className="wx-widget" style={{ background: bg }}>
+    <WidgetWrapper
+      widgetId="weather"
+      title="Wetter"
+      icon={<MapPin size={16} />}
+      style={{ '--wx-bg': bg } as React.CSSProperties}
+    >
+      <div className="wx-widget">
 
         {/* Animated background particles */}
         <Particles type={type} />
