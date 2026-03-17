@@ -97,25 +97,73 @@ function parseStooqCSV(csv: string, symbol: string, stooqSym: string): StockData
   };
 }
 
-// ── Fetch mit mehreren Proxy-Fallbacks ────────────────────────────────────────
+// ── Fetch: Yahoo Finance (primär) + Stooq (fallback) ─────────────────────────
 
-const PROXIES = [
-  (url: string) => url,                                           // Direktversuch
+const CORS_PROXIES = [
+  (url: string) => url,  // Direktversuch (klappt manchmal bei Yahoo Finance)
   (url: string) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
   (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
   (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
 ];
 
+async function fetchFromYahoo(symbol: string): Promise<StockData | null> {
+  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1mo&interval=1d&includePrePost=false`;
+  for (const makeUrl of CORS_PROXIES) {
+    try {
+      const res = await fetch(makeUrl(yahooUrl), { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) continue;
+      const json = await res.json();
+      const chartResult = json?.chart?.result?.[0];
+      if (!chartResult) continue;
+
+      const meta = chartResult.meta;
+      const closePrices: (number | null)[] = chartResult.indicators?.quote?.[0]?.close || [];
+      const validCloses = closePrices.filter((v): v is number => v !== null && !isNaN(v) && v > 0);
+      const price = meta.regularMarketPrice;
+      if (!price) continue;
+
+      const prevClose = meta.previousClose || meta.chartPreviousClose
+        || (validCloses.length >= 2 ? validCloses[validCloses.length - 2] : price);
+      const change = price - prevClose;
+      const changePercent = prevClose ? (change / prevClose) * 100 : 0;
+      const history = validCloses.slice(-7);
+
+      const lastTs = chartResult.timestamp?.[chartResult.timestamp.length - 1];
+      const date = lastTs ? new Date(lastTs * 1000).toLocaleDateString('de-DE') : '';
+
+      return {
+        symbol,
+        price,
+        change,
+        changePercent,
+        currency: meta.currency || currencyFromSymbol(toStooqSymbol(symbol)),
+        date,
+        history,
+      };
+    } catch { continue; }
+  }
+  return null;
+}
+
 async function fetchStock(symbol: string): Promise<StockData | null> {
+  // 1. Yahoo Finance versuchen (JSON, CORS-freundlicher)
+  const yahooResult = await fetchFromYahoo(symbol);
+  if (yahooResult) return yahooResult;
+
+  // 2. Fallback: Stooq (CSV via Proxy — kein Direktversuch, CORS blockiert immer)
   const stooqSym = toStooqSymbol(symbol);
   const d2 = new Date();
-  const d1 = new Date(d2.getTime() - 21 * 24 * 60 * 60 * 1000); // 21 Tage
+  const d1 = new Date(d2.getTime() - 21 * 24 * 60 * 60 * 1000);
   const fmt = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, '');
   const stooqUrl = `https://stooq.com/q/d/l/?s=${encodeURIComponent(stooqSym)}&d1=${fmt(d1)}&d2=${fmt(d2)}&i=d`;
-
-  for (const makeUrl of PROXIES) {
+  const stooqProxies = [
+    `https://corsproxy.io/?url=${encodeURIComponent(stooqUrl)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(stooqUrl)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(stooqUrl)}`,
+  ];
+  for (const url of stooqProxies) {
     try {
-      const res = await fetch(makeUrl(stooqUrl), { signal: AbortSignal.timeout(10000) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
       if (!res.ok) continue;
       const text = await res.text();
       const result = parseStooqCSV(text, symbol, stooqSym);

@@ -15,6 +15,20 @@ interface CoinData {
 }
 
 const DEFAULT_COINS = ['bitcoin', 'ethereum', 'solana', 'ripple'];
+
+// Ticker-Symbol → CoinGecko-ID Mapping (damit User "VET" statt "vechain" eingeben kann)
+const COIN_SYMBOL_MAP: Record<string, string> = {
+  'btc': 'bitcoin', 'eth': 'ethereum', 'sol': 'solana', 'xrp': 'ripple',
+  'vet': 'vechain', 'ada': 'cardano', 'dot': 'polkadot', 'bnb': 'binancecoin',
+  'doge': 'dogecoin', 'shib': 'shiba-inu', 'avax': 'avalanche-2', 'link': 'chainlink',
+  'ltc': 'litecoin', 'matic': 'matic-network', 'pol': 'matic-network',
+  'uni': 'uniswap', 'atom': 'cosmos', 'trx': 'tron', 'xlm': 'stellar',
+  'etc': 'ethereum-classic', 'fil': 'filecoin', 'near': 'near',
+  'icp': 'internet-computer', 'hbar': 'hedera-hashgraph', 'apt': 'aptos',
+  'sui': 'sui', 'op': 'optimism', 'arb': 'arbitrum', 'pepe': 'pepe',
+  'floki': 'floki', 'bonk': 'bonk', 'ton': 'the-open-network',
+};
+
 const CACHE_KEY = 'crypto-cache';
 const CACHE_TTL_MS = 10 * 60 * 1000 as number; // 10 Minuten — wird in isCacheValid genutzt
 void CACHE_TTL_MS; // temporär: TTL-Validierung wird noch implementiert
@@ -114,7 +128,9 @@ export default function CryptoWidget() {
     setFromCache(false);
 
     try {
-      const ids = coins.join(',');
+      // Ticker-Symbole (z.B. "vet") → CoinGecko-IDs (z.B. "vechain") auflösen
+      const resolvedIds = coins.map(id => COIN_SYMBOL_MAP[id] || id);
+      const ids = resolvedIds.join(',');
       const url =
         `https://api.coingecko.com/api/v3/coins/markets?vs_currency=${currency}` +
         `&ids=${ids}&order=market_cap_desc&per_page=20&page=1&sparkline=false`;
@@ -126,7 +142,10 @@ export default function CryptoWidget() {
       if (!Array.isArray(json)) throw new Error('Ungültige API-Antwort');
 
       const ordered = coins
-        .map(id => json.find(c => c.id === id))
+        .map(id => {
+          const resolvedId = COIN_SYMBOL_MAP[id] || id;
+          return json.find(c => c.id === resolvedId);
+        })
         .filter(Boolean) as CoinData[];
       setData(ordered);
       saveCache(ordered, currency);
@@ -160,7 +179,9 @@ export default function CryptoWidget() {
   }, [fetchData]);
 
   const addCoin = () => {
-    const id = newCoin.trim().toLowerCase().replace(/\s+/g, '-');
+    const input = newCoin.trim().toLowerCase().replace(/\s+/g, '-');
+    // Ticker-Symbol zu CoinGecko-ID auflösen (z.B. "vet" → "vechain")
+    const id = COIN_SYMBOL_MAP[input] || input;
     if (id && !coins.includes(id)) setCoins([...coins, id]);
     setNewCoin('');
     setShowAdd(false);
