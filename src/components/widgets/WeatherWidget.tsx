@@ -459,11 +459,11 @@ export default function WeatherWidget() {
                   <MiniIcon type={wxType(day.weather_code)} />
                   <div className="wx-fday-temps">
                     <span className="wx-fday-hi">{day.temp_max}°</span>
-                    <span className="wx-fday-lo">/{day.temp_min}°</span>
+                    <span className="wx-fday-lo"> / {day.temp_min}°</span>
                   </div>
-                  {day.precip_prob > 10 && (
-                    <div className="wx-fday-rain">💧{day.precip_prob}%</div>
-                  )}
+                  <div className="wx-fday-rain">
+                    {day.precip_prob > 0 ? `💧 ${day.precip_prob}%` : '\u00a0'}
+                  </div>
                 </div>
               ))}
             </div>

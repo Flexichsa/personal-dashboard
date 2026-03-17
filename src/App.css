@@ -5672,69 +5672,70 @@ button:focus:not(:focus-visible) { outline: none; }
 .wx-forecast {
   display: flex;
   gap: 0;
-  background: rgba(0,0,0,0.22);
-  border-top: 1px solid rgba(255,255,255,0.08);
-  padding: 6px 0 4px;
+  background: rgba(0,0,0,0.28);
+  border-top: 1px solid rgba(255,255,255,0.10);
+  padding: 10px 0 8px;
   margin: 0 -14px;
   overflow-x: auto;
   scrollbar-width: none;
+  flex-shrink: 0;
 }
 .wx-forecast::-webkit-scrollbar { display: none; }
 
 .wx-fday {
   flex: 1;
-  min-width: 52px;
+  min-width: 76px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 4px 4px;
-  border-right: 1px solid rgba(255,255,255,0.06);
+  gap: 5px;
+  padding: 8px 6px;
+  border-right: 1px solid rgba(255,255,255,0.07);
   transition: background 0.15s;
 }
 .wx-fday:last-child { border-right: none; }
-.wx-fday:hover { background: rgba(255,255,255,0.06); }
+.wx-fday:hover { background: rgba(255,255,255,0.07); }
 
 .wx-fday-today {
-  background: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.10);
 }
 
 .wx-fday-name {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.5);
+  color: rgba(255,255,255,0.55);
 }
 .wx-fday-today .wx-fday-name {
-  color: rgba(255,255,255,0.85);
+  color: rgba(255,255,255,0.95);
 }
 
 .wx-mini-icon {
-  font-size: 16px;
+  font-size: 26px;
   line-height: 1;
 }
 
 .wx-fday-temps {
   display: flex;
   align-items: baseline;
-  gap: 1px;
+  gap: 2px;
 }
 
 .wx-fday-hi {
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 700;
   color: #ffffff;
 }
 
 .wx-fday-lo {
-  font-size: 10px;
+  font-size: 13px;
   color: rgba(255,255,255,0.45);
 }
 
 .wx-fday-rain {
-  font-size: 9px;
-  color: rgba(147, 197, 253, 0.8);
+  font-size: 11px;
+  color: rgba(147, 197, 253, 0.85);
   line-height: 1;
 }
 
