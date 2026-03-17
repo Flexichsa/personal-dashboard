@@ -273,7 +273,8 @@ export default function CryptoWidget() {
           {loading && data.length === 0
             ? coins.map(id => <SkeletonRow key={id} />)
             : coins.map(coinId => {
-                const coin = data.find(c => c.id === coinId);
+                const resolvedId = COIN_SYMBOL_MAP[coinId] || coinId;
+                const coin = data.find(c => c.id === resolvedId);
                 const isLoading = loading && !coin;
                 if (isLoading) return <SkeletonRow key={coinId} />;
                 return (
