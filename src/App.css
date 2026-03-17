@@ -4751,6 +4751,328 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin 1s linear infinite; }
 
+/* ===== WETTER ANIMATIONEN ===== */
+
+@keyframes sun-rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes sun-pulse {
+  0%, 100% { opacity: 0.25; }
+  50%       { opacity: 0.5; }
+}
+
+@keyframes rain-fall {
+  0%   { transform: translateY(-4px); opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateY(10px); opacity: 0; }
+}
+
+@keyframes snow-fall {
+  0%   { transform: translateY(-4px) rotate(0deg); opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 0.8; }
+  100% { transform: translateY(12px) rotate(180deg); opacity: 0; }
+}
+
+@keyframes lightning-flash {
+  0%, 100%       { opacity: 1; }
+  10%, 30%, 50%  { opacity: 0.15; }
+  20%, 40%, 60%  { opacity: 1; }
+  70%            { opacity: 0.6; }
+}
+
+@keyframes cloud-float {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(3px); }
+}
+
+/* Animiertes Icon – Container */
+.weather-animated-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Sonne */
+.weather-icon-sun .sun-glow-ring {
+  fill: none;
+  stroke: #FCD34D;
+  stroke-width: 1.5;
+  animation: sun-pulse 2.5s ease-in-out infinite;
+}
+.weather-icon-sun {
+  animation: sun-rotate 20s linear infinite;
+}
+.weather-icon-sun .sun-core {
+  animation: sun-pulse 2s ease-in-out infinite;
+}
+
+/* Regen-Tropfen */
+.rain-drop {
+  animation: rain-fall 1.2s ease-in infinite;
+}
+.rain-drop-1 { animation-delay: 0s; }
+.rain-drop-2 { animation-delay: 0.25s; }
+.rain-drop-3 { animation-delay: 0.5s; }
+.rain-drop-4 { animation-delay: 0.1s; }
+.rain-drop-5 { animation-delay: 0.35s; }
+
+/* Schnee */
+.snow-flake {
+  animation: snow-fall 2s ease-in infinite;
+}
+.snow-flake-1 { animation-delay: 0s; }
+.snow-flake-2 { animation-delay: 0.6s; }
+.snow-flake-3 { animation-delay: 1.1s; }
+
+/* Gewitter */
+.lightning-bolt {
+  animation: lightning-flash 3s ease-in-out infinite;
+}
+
+/* Wolke */
+.weather-icon-cloud {
+  animation: cloud-float 4s ease-in-out infinite;
+}
+
+/* Mini-Icons im Forecast */
+.weather-mini-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* ===== WETTER WIDGET – NEUES LAYOUT ===== */
+
+/* Hintergründe je Wetter-Typ */
+.weather-bg-sun {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.06) 0%, transparent 60%);
+  border-radius: var(--radius-md);
+}
+.weather-bg-rain, .weather-bg-drizzle {
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.06) 0%, transparent 60%);
+  border-radius: var(--radius-md);
+}
+.weather-bg-snow {
+  background: linear-gradient(135deg, rgba(186, 230, 253, 0.08) 0%, transparent 60%);
+  border-radius: var(--radius-md);
+}
+.weather-bg-thunder {
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.08) 0%, transparent 60%);
+  border-radius: var(--radius-md);
+}
+.weather-bg-fog, .weather-bg-cloud {
+  background: transparent;
+}
+
+/* Hero-Zeile: Icon + Temperatur */
+.weather-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 8px;
+}
+
+.weather-hero-right {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Temperatur-Override für neues Layout */
+.weather-widget .weather-temp {
+  font-family: var(--font-display);
+  font-size: 42px;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.weather-widget .weather-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* Details-Zeile */
+.weather-details-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 0 8px;
+}
+
+.weather-detail-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Forecast-Scroll */
+.weather-forecast-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 6px 6px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.weather-forecast-scroll::-webkit-scrollbar { display: none; }
+
+.weather-forecast-card {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 8px 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  min-width: 56px;
+  transition: border-color 0.15s;
+}
+.weather-forecast-card:hover {
+  border-color: var(--border-hover);
+}
+
+.weather-forecast-day {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.weather-forecast-temps {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.weather-forecast-max {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.weather-forecast-min {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.weather-forecast-precip {
+  font-size: 9px;
+  color: #60A5FA;
+  white-space: nowrap;
+}
+
+/* Stadt-Zeile Override */
+.weather-widget .weather-city {
+  align-self: flex-start;
+  margin-left: 4px;
+  font-size: 11px;
+}
+
+/* ===== CRYPTO WIDGET – NEUE STILE ===== */
+
+/* Cache-Fehler blau statt gelb */
+.crypto-error-cache {
+  color: #60A5FA;
+  background: rgba(96, 165, 250, 0.06);
+  border-color: rgba(96, 165, 250, 0.2);
+}
+
+/* Marktdaten-Block rechts im Coin-Row */
+.crypto-market-data {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 1px 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.crypto-market-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  text-align: right;
+}
+
+.crypto-market-value {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Skeleton-Animation */
+@keyframes skeleton-shimmer {
+  0%   { background-position: -200px 0; }
+  100% { background-position: 200px 0; }
+}
+
+.crypto-skeleton {
+  height: 12px;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    var(--bg-input) 25%,
+    var(--border) 50%,
+    var(--bg-input) 75%
+  );
+  background-size: 400px 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+}
+
+.crypto-skeleton-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.crypto-skeleton-sm {
+  height: 10px;
+}
+
+.crypto-skeleton-row {
+  pointer-events: none;
+}
+
+/* ===== STOCKS WIDGET – NEUE STILE ===== */
+
+.stocks-row-cached {
+  opacity: 0.85;
+}
+
+.stocks-date {
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.stocks-cache-badge {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.stocks-sparkline {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.stocks-skeleton-row {
+  pointer-events: none;
+}
+
 /* ── MacStats: System Info Bar ── */
 .macstats-sysbar {
   display: flex;
