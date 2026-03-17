@@ -5310,3 +5310,96 @@
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
+
+/* ==========================================================================
+   UI/UX DESIGN UPGRADE — Glasmorphismus, Elevation, Micro-Interactions
+   ========================================================================== */
+
+/* Enhanced Glasmorphismus */
+.widget-wrapper {
+  backdrop-filter: blur(32px) saturate(200%) brightness(1.05) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(200%) brightness(1.05) !important;
+  background: var(--bg-card) !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  box-shadow: var(--shadow-card) !important;
+  transition: transform 0.3s var(--ease-spring), box-shadow 0.4s ease, border-color 0.3s ease !important;
+  contain: layout style;
+}
+
+[data-theme="light"] .widget-wrapper {
+  backdrop-filter: blur(24px) saturate(150%) brightness(1.02) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(150%) brightness(1.02) !important;
+  border-color: rgba(255,255,255,0.65) !important;
+  box-shadow: var(--shadow-card), inset 0 1px 0 rgba(255,255,255,0.85) !important;
+}
+
+/* Widget Hover Elevation — "picked up" feel */
+.widget-wrapper:not(.dragging):hover {
+  transform: translateY(-3px) !important;
+  box-shadow: var(--shadow-card-hover) !important;
+  border-color: rgba(255,255,255,0.14) !important;
+}
+
+/* Dragging state */
+.react-grid-item.react-draggable-dragging .widget-wrapper {
+  transform: scale(1.02) !important;
+  box-shadow: var(--shadow-card-hover), 0 0 0 2px rgba(124,58,237,0.25) !important;
+  border-color: rgba(124,58,237,0.3) !important;
+  z-index: 100;
+}
+
+/* Gradient top-border per Widget-Accent */
+.widget-wrapper::before {
+  background: linear-gradient(
+    90deg,
+    transparent 5%,
+    var(--widget-accent, var(--accent)) 35%,
+    var(--widget-accent, var(--accent)) 65%,
+    transparent 95%
+  ) !important;
+  height: 2px !important;
+  opacity: 0.7;
+}
+.widget-wrapper:hover::before { opacity: 1; }
+
+/* Accent glow area on hover */
+.widget-wrapper::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 60px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--widget-accent, var(--accent)), transparent 92%), transparent);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.widget-wrapper:hover::after { opacity: 1; }
+
+/* Card sub-items lift on hover */
+.vault-entry:hover, .hw-card:hover, .note-card:hover, .clock-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* Staggered reveal with blur */
+@keyframes widgetRevealEnhanced {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); filter: blur(4px); }
+  60% { filter: blur(0px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0px); }
+}
+
+/* Focus visible */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+button:focus:not(:focus-visible) { outline: none; }
+
+/* Empty states fade-in */
+.weather-loading, .weather-error, .crypto-loading, .contacts-empty-state {
+  animation: fadeInSoft 0.4s ease;
+}
+@keyframes fadeInSoft {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
