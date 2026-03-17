@@ -1,18 +1,17 @@
-import { useState, useEffect } from 'react';
-import { MapPin, RefreshCw, Droplets, Wind, Thermometer } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { MapPin, RefreshCw } from 'lucide-react';
 import WidgetWrapper from '../WidgetWrapper';
 import { useSupabase } from '../../hooks/useSupabase';
 
-interface WeatherPrefs {
-  id: string;
-  city: string;
-}
+interface WeatherPrefs { id: string; city: string; }
 
 interface CurrentWeather {
   temp: number;
   feels_like: number;
   humidity: number;
   wind_speed: number;
+  wind_dir: number;
+  pressure: number;
   weather_code: number;
   city: string;
 }
@@ -24,13 +23,16 @@ interface DailyForecast {
   temp_max: number;
   temp_min: number;
   precip_prob: number;
+  uv_index: number;
 }
 
-// ── WMO weather code helpers ─────────────────────────────────────────────────
+// ── WMO helpers ───────────────────────────────────────────────────────────────
 
-function getWeatherType(code: number): 'sun' | 'cloud' | 'rain' | 'drizzle' | 'snow' | 'thunder' | 'fog' {
+type WxType = 'sun' | 'partly' | 'cloud' | 'fog' | 'drizzle' | 'rain' | 'snow' | 'thunder';
+
+function wxType(code: number): WxType {
   if (code === 0) return 'sun';
-  if (code <= 2) return 'cloud';
+  if (code <= 2) return 'partly';
   if (code === 3) return 'cloud';
   if (code <= 48) return 'fog';
   if (code <= 57) return 'drizzle';
@@ -41,349 +43,416 @@ function getWeatherType(code: number): 'sun' | 'cloud' | 'rain' | 'drizzle' | 's
   return 'thunder';
 }
 
-function getWeatherDescription(code: number): string {
+function wxDesc(code: number): string {
   if (code === 0) return 'Klarer Himmel';
   if (code === 1) return 'Überwiegend klar';
   if (code === 2) return 'Teilweise bewölkt';
   if (code === 3) return 'Bedeckt';
-  if (code <= 48) return 'Nebel';
-  if (code <= 55) return 'Nieselregen';
-  if (code <= 57) return 'Gefrierender Nieselregen';
-  if (code <= 65) return 'Regen';
-  if (code <= 67) return 'Gefrierender Regen';
+  if (code <= 48) return 'Nebelig';
+  if (code <= 57) return 'Nieselregen';
+  if (code <= 67) return 'Regen';
   if (code <= 77) return 'Schnee';
   if (code <= 82) return 'Regenschauer';
   if (code <= 86) return 'Schneeschauer';
-  if (code <= 99) return 'Gewitter';
-  return 'Unbekannt';
+  return 'Gewitter';
 }
 
-// ── Animierte SVG-Icons ───────────────────────────────────────────────────────
+const COMPASS = ['N','NNO','NO','ONO','O','OSO','SO','SSO','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+function windCompass(deg: number) { return COMPASS[Math.round(deg / 22.5) % 16]; }
 
-function SunIcon() {
-  return (
-    <svg width="56" height="56" viewBox="0 0 56 56" fill="none" className="weather-animated-icon weather-icon-sun">
-      {/* Glowing ring */}
-      <circle cx="28" cy="28" r="24" className="sun-glow-ring" />
-      {/* Rays */}
-      {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => (
-        <line
-          key={i}
-          x1="28" y1="4"
-          x2="28" y2="10"
-          stroke="#FCD34D"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          style={{ transformOrigin: '28px 28px', transform: `rotate(${angle}deg)` }}
-          className="sun-ray"
-        />
-      ))}
-      {/* Core */}
-      <circle cx="28" cy="28" r="11" fill="#FBBF24" className="sun-core" />
-    </svg>
-  );
+function fmtSunTime(iso: string) { return iso ? iso.slice(11, 16) : '--:--'; }
+
+// ── Background gradients ──────────────────────────────────────────────────────
+
+const BG: Record<WxType, string> = {
+  sun:     'linear-gradient(155deg, #0c2d50 0%, #1a4a7a 35%, #c44b0d 80%, #f97316 100%)',
+  partly:  'linear-gradient(155deg, #0f3460 0%, #1a4a75 45%, #b85c38 100%)',
+  cloud:   'linear-gradient(155deg, #162538 0%, #253f5a 55%, #3a5a7a 100%)',
+  fog:     'linear-gradient(155deg, #252f3e 0%, #3d4f61 55%, #607080 100%)',
+  drizzle: 'linear-gradient(155deg, #152030 0%, #263d55 55%, #3a5570 100%)',
+  rain:    'linear-gradient(155deg, #0d1b2a 0%, #192d40 40%, #283f55 100%)',
+  snow:    'linear-gradient(155deg, #1a2840 0%, #2d4055 40%, #7a90a0 100%)',
+  thunder: 'linear-gradient(155deg, #0a0e18 0%, #161e2e 50%, #252e3f 100%)',
+};
+
+// ── Animated particles ────────────────────────────────────────────────────────
+
+function Particles({ type }: { type: WxType }) {
+  if (type === 'rain' || type === 'drizzle') {
+    return (
+      <div className="wx-particles" aria-hidden="true">
+        {Array.from({ length: 22 }).map((_, i) => (
+          <div
+            key={i}
+            className="wx-raindrop"
+            style={{
+              left: `${(i * 4.2 + 3) % 96}%`,
+              animationDelay: `${(i * 0.11) % 1.3}s`,
+              animationDuration: `${0.55 + (i * 0.06) % 0.5}s`,
+              width: type === 'drizzle' ? '1px' : '1.5px',
+              height: type === 'drizzle' ? '8px' : '14px',
+              opacity: 0.35 + (i % 3) * 0.18,
+            }}
+          />
+        ))}
+      </div>
+    );
+  }
+  if (type === 'snow') {
+    return (
+      <div className="wx-particles" aria-hidden="true">
+        {Array.from({ length: 18 }).map((_, i) => (
+          <div
+            key={i}
+            className="wx-snowflake"
+            style={{
+              left: `${(i * 5.1 + 2) % 94}%`,
+              animationDelay: `${(i * 0.35) % 3.5}s`,
+              animationDuration: `${3.5 + (i % 5)}s`,
+              fontSize: `${8 + (i % 4) * 3}px`,
+              opacity: 0.55 + (i % 3) * 0.15,
+            }}
+          >
+            {i % 2 === 0 ? '❄' : '❅'}
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (type === 'thunder') {
+    return (
+      <div className="wx-particles" aria-hidden="true">
+        <div className="wx-lightning-flash" />
+        {Array.from({ length: 10 }).map((_, i) => (
+          <div
+            key={i}
+            className="wx-raindrop wx-raindrop-heavy"
+            style={{
+              left: `${(i * 9.5 + 3) % 93}%`,
+              animationDelay: `${(i * 0.09) % 0.7}s`,
+              animationDuration: `${0.38 + (i % 3) * 0.08}s`,
+              height: '18px', width: '1.5px', opacity: 0.5,
+            }}
+          />
+        ))}
+      </div>
+    );
+  }
+  if (type === 'sun') {
+    return (
+      <div className="wx-particles" aria-hidden="true">
+        <div className="wx-sun-glow-bg" />
+      </div>
+    );
+  }
+  return null;
 }
 
-function CloudIcon() {
-  return (
-    <svg width="56" height="56" viewBox="0 0 56 56" fill="none" className="weather-animated-icon weather-icon-cloud">
-      <ellipse cx="28" cy="34" rx="18" ry="10" fill="#94A3B8" />
-      <circle cx="22" cy="30" r="9" fill="#94A3B8" />
-      <circle cx="33" cy="28" r="11" fill="#CBD5E1" />
-      <ellipse cx="28" cy="34" rx="18" ry="10" fill="#CBD5E1" />
-    </svg>
-  );
-}
+// ── Large animated icon ───────────────────────────────────────────────────────
 
-function RainIcon() {
-  return (
-    <svg width="56" height="56" viewBox="0 0 56 56" fill="none" className="weather-animated-icon weather-icon-rain">
-      <ellipse cx="28" cy="22" rx="18" ry="10" fill="#64748B" />
-      <circle cx="22" cy="18" r="9" fill="#64748B" />
-      <circle cx="33" cy="16" r="11" fill="#94A3B8" />
-      <ellipse cx="28" cy="22" rx="18" ry="10" fill="#94A3B8" />
-      {/* Drops */}
-      <line x1="20" y1="34" x2="18" y2="42" stroke="#60A5FA" strokeWidth="2" strokeLinecap="round" className="rain-drop rain-drop-1" />
-      <line x1="28" y1="34" x2="26" y2="42" stroke="#60A5FA" strokeWidth="2" strokeLinecap="round" className="rain-drop rain-drop-2" />
-      <line x1="36" y1="34" x2="34" y2="42" stroke="#60A5FA" strokeWidth="2" strokeLinecap="round" className="rain-drop rain-drop-3" />
-      <line x1="16" y1="38" x2="14" y2="46" stroke="#93C5FD" strokeWidth="1.5" strokeLinecap="round" className="rain-drop rain-drop-4" />
-      <line x1="32" y1="38" x2="30" y2="46" stroke="#93C5FD" strokeWidth="1.5" strokeLinecap="round" className="rain-drop rain-drop-5" />
-    </svg>
-  );
-}
-
-function DrizzleIcon() {
-  return (
-    <svg width="56" height="56" viewBox="0 0 56 56" fill="none" className="weather-animated-icon weather-icon-rain">
-      <ellipse cx="28" cy="22" rx="18" ry="10" fill="#64748B" />
-      <circle cx="22" cy="18" r="9" fill="#64748B" />
-      <circle cx="33" cy="16" r="11" fill="#94A3B8" />
-      <ellipse cx="28" cy="22" rx="18" ry="10" fill="#94A3B8" />
-      <line x1="22" y1="33" x2="21" y2="39" stroke="#93C5FD" strokeWidth="1.5" strokeLinecap="round" className="rain-drop rain-drop-1" />
-      <line x1="30" y1="35" x2="29" y2="41" stroke="#93C5FD" strokeWidth="1.5" strokeLinecap="round" className="rain-drop rain-drop-3" />
-      <line x1="26" y1="38" x2="25" y2="44" stroke="#BFDBFE" strokeWidth="1.5" strokeLinecap="round" className="rain-drop rain-drop-2" />
-    </svg>
-  );
-}
-
-function SnowIcon() {
-  return (
-    <svg width="56" height="56" viewBox="0 0 56 56" fill="none" className="weather-animated-icon weather-icon-snow">
-      <ellipse cx="28" cy="22" rx="18" ry="10" fill="#94A3B8" />
-      <circle cx="22" cy="18" r="9" fill="#94A3B8" />
-      <circle cx="33" cy="16" r="11" fill="#CBD5E1" />
-      <ellipse cx="28" cy="22" rx="18" ry="10" fill="#CBD5E1" />
-      {/* Snowflakes */}
-      <text x="18" y="42" fontSize="10" fill="#BAE6FD" className="snow-flake snow-flake-1">❄</text>
-      <text x="26" y="44" fontSize="8" fill="#E0F2FE" className="snow-flake snow-flake-2">❅</text>
-      <text x="34" y="41" fontSize="9" fill="#BAE6FD" className="snow-flake snow-flake-3">❄</text>
-    </svg>
-  );
-}
-
-function ThunderIcon() {
-  return (
-    <svg width="56" height="56" viewBox="0 0 56 56" fill="none" className="weather-animated-icon weather-icon-thunder">
-      <ellipse cx="28" cy="20" rx="20" ry="11" fill="#475569" />
-      <circle cx="21" cy="16" r="10" fill="#475569" />
-      <circle cx="34" cy="14" r="12" fill="#64748B" />
-      <ellipse cx="28" cy="20" rx="20" ry="11" fill="#64748B" />
-      {/* Lightning bolt */}
-      <polygon
-        points="30,28 24,38 29,38 26,48 34,34 28,34"
-        fill="#FDE047"
-        className="lightning-bolt"
-      />
-    </svg>
-  );
-}
-
-function FogIcon() {
-  return (
-    <svg width="56" height="56" viewBox="0 0 56 56" fill="none" className="weather-animated-icon weather-icon-cloud">
-      <rect x="8" y="24" width="40" height="3" rx="1.5" fill="#94A3B8" opacity="0.7" />
-      <rect x="12" y="30" width="32" height="3" rx="1.5" fill="#94A3B8" opacity="0.5" />
-      <rect x="6" y="18" width="44" height="3" rx="1.5" fill="#CBD5E1" opacity="0.6" />
-      <rect x="10" y="36" width="36" height="3" rx="1.5" fill="#94A3B8" opacity="0.4" />
-    </svg>
-  );
-}
-
-function WeatherIcon({ type }: { type: ReturnType<typeof getWeatherType> }) {
+function BigIcon({ type }: { type: WxType }) {
   switch (type) {
-    case 'sun':     return <SunIcon />;
-    case 'rain':    return <RainIcon />;
-    case 'drizzle': return <DrizzleIcon />;
-    case 'snow':    return <SnowIcon />;
-    case 'thunder': return <ThunderIcon />;
-    case 'fog':     return <FogIcon />;
-    default:        return <CloudIcon />;
+    case 'sun':
+      return (
+        <div className="wx-bigicon wx-bigicon-sun">
+          <div className="wx-sun-core" />
+          {[0,45,90,135,180,225,270,315].map((a, i) => (
+            <div key={i} className="wx-sun-ray" style={{ transform: `rotate(${a}deg) translateY(-44px)` }} />
+          ))}
+        </div>
+      );
+    case 'partly':
+      return (
+        <div className="wx-bigicon wx-bigicon-partly">
+          <div className="wx-sun-core wx-sun-sm" />
+          {[0,60,120,180,240,300].map((a, i) => (
+            <div key={i} className="wx-sun-ray wx-sun-ray-sm" style={{ transform: `rotate(${a}deg) translateY(-30px)` }} />
+          ))}
+          <div className="wx-cloud-shape wx-cloud-front" />
+        </div>
+      );
+    case 'rain':
+    case 'drizzle':
+      return (
+        <div className="wx-bigicon wx-bigicon-rain">
+          <div className="wx-cloud-shape" />
+          <div className="wx-icon-drops">
+            {[0,1,2,3,4].map(i => <div key={i} className={`wx-icon-drop wx-icon-drop-${i}`} />)}
+          </div>
+        </div>
+      );
+    case 'snow':
+      return (
+        <div className="wx-bigicon wx-bigicon-snow">
+          <div className="wx-cloud-shape" />
+          <div className="wx-icon-drops">
+            {[0,1,2,3,4].map(i => <div key={i} className={`wx-icon-snowdot wx-icon-snowdot-${i}`}>❄</div>)}
+          </div>
+        </div>
+      );
+    case 'thunder':
+      return (
+        <div className="wx-bigicon wx-bigicon-thunder">
+          <div className="wx-cloud-shape wx-cloud-dark" />
+          <div className="wx-bolt-icon">⚡</div>
+        </div>
+      );
+    case 'fog':
+      return (
+        <div className="wx-bigicon wx-bigicon-fog">
+          {[0,1,2,3].map(i => <div key={i} className={`wx-fog-bar wx-fog-bar-${i}`} />)}
+        </div>
+      );
+    default:
+      return (
+        <div className="wx-bigicon wx-bigicon-cloud">
+          <div className="wx-cloud-shape" />
+        </div>
+      );
   }
 }
 
-function SmallWeatherIcon({ type }: { type: ReturnType<typeof getWeatherType> }) {
-  switch (type) {
-    case 'sun':     return <span className="weather-mini-icon weather-mini-sun">☀</span>;
-    case 'rain':    return <span className="weather-mini-icon weather-mini-rain">🌧</span>;
-    case 'drizzle': return <span className="weather-mini-icon weather-mini-rain">🌦</span>;
-    case 'snow':    return <span className="weather-mini-icon weather-mini-snow">🌨</span>;
-    case 'thunder': return <span className="weather-mini-icon weather-mini-thunder">⛈</span>;
-    case 'fog':     return <span className="weather-mini-icon">🌫</span>;
-    default:        return <span className="weather-mini-icon">☁</span>;
-  }
+// ── Mini emoji icon for forecast ──────────────────────────────────────────────
+
+function MiniIcon({ type }: { type: WxType }) {
+  const icons: Record<WxType, string> = {
+    sun: '☀️', partly: '⛅', cloud: '☁️',
+    fog: '🌫️', drizzle: '🌦️', rain: '🌧️',
+    snow: '❄️', thunder: '⛈️',
+  };
+  return <span className="wx-mini-icon">{icons[type]}</span>;
 }
 
-// ── Hauptkomponente ───────────────────────────────────────────────────────────
+// ── Live clock hook ───────────────────────────────────────────────────────────
+
+function useClock() {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return now;
+}
+
+const WDAYS  = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+const MONTHS = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 export default function WeatherWidget() {
-  const [prefsArr, setPrefsArr] = useSupabase<WeatherPrefs>('weather-prefs', [{ id: 'weather-settings', city: 'Berlin' }]);
-  const prefs = prefsArr[0] || { id: 'weather-settings', city: 'Berlin' };
+  const [prefsArr, setPrefsArr] = useSupabase<WeatherPrefs>(
+    'weather-prefs',
+    [{ id: 'weather-settings', city: 'Zürich' }]
+  );
+  const prefs = prefsArr[0] || { id: 'weather-settings', city: 'Zürich' };
   const city = prefs.city;
-  const setCity = (newCity: string) => setPrefsArr([{ ...prefs, city: newCity }]);
+  const setCity = (c: string) => setPrefsArr([{ ...prefs, city: c }]);
 
-  const [current, setCurrent] = useState<CurrentWeather | null>(null);
+  const [current, setCurrent]   = useState<CurrentWeather | null>(null);
   const [forecast, setForecast] = useState<DailyForecast[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  const [sunTimes, setSunTimes] = useState<{ rise: string; set: string } | null>(null);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState(false);
   const [editCity, setEditCity] = useState(false);
   const [cityInput, setCityInput] = useState(city);
+  const now = useClock();
 
-  const fetchWeather = async (cityName: string) => {
+  const fetchWeather = useCallback(async (cityName: string) => {
     setLoading(true);
     setError(false);
     try {
-      const geoRes = await fetch(
+      const geo = await fetch(
         `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=1&language=de`,
         { signal: AbortSignal.timeout(8000) }
-      );
-      const geoData = await geoRes.json();
+      ).then(r => r.json());
+      if (!geo.results?.[0]) throw new Error('City not found');
 
-      if (!geoData.results?.[0]) {
-        setError(true);
-        setLoading(false);
-        return;
-      }
+      const { latitude, longitude, name } = geo.results[0];
 
-      const { latitude, longitude, name } = geoData.results[0];
-      const weatherRes = await fetch(
-        `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}` +
-        `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m` +
-        `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_mean` +
+      const wx = await fetch(
+        `https://api.open-meteo.com/v1/forecast` +
+        `?latitude=${latitude}&longitude=${longitude}` +
+        `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure` +
+        `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_mean,sunrise,sunset,uv_index_max` +
         `&timezone=auto&forecast_days=7`,
         { signal: AbortSignal.timeout(10000) }
-      );
-      const data = await weatherRes.json();
+      ).then(r => r.json());
 
       setCurrent({
-        temp: Math.round(data.current.temperature_2m),
-        feels_like: Math.round(data.current.apparent_temperature),
-        humidity: data.current.relative_humidity_2m,
-        wind_speed: Math.round(data.current.wind_speed_10m),
-        weather_code: data.current.weather_code,
+        temp:         Math.round(wx.current.temperature_2m),
+        feels_like:   Math.round(wx.current.apparent_temperature),
+        humidity:     wx.current.relative_humidity_2m,
+        wind_speed:   Math.round(wx.current.wind_speed_10m),
+        wind_dir:     Math.round(wx.current.wind_direction_10m ?? 0),
+        pressure:     Math.round(wx.current.surface_pressure ?? 1013),
+        weather_code: wx.current.weather_code,
         city: name,
       });
 
-      const weekdays = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
-      const days: DailyForecast[] = data.daily.time.map((dateStr: string, i: number) => {
-        const d = new Date(dateStr);
-        return {
-          date: dateStr,
-          weekday: i === 0 ? 'Heute' : i === 1 ? 'Morgen' : weekdays[d.getDay()],
-          weather_code: data.daily.weather_code[i],
-          temp_max: Math.round(data.daily.temperature_2m_max[i]),
-          temp_min: Math.round(data.daily.temperature_2m_min[i]),
-          precip_prob: Math.round(data.daily.precipitation_probability_mean[i] ?? 0),
-        };
+      setSunTimes({
+        rise: fmtSunTime(wx.daily.sunrise?.[0] ?? ''),
+        set:  fmtSunTime(wx.daily.sunset?.[0]  ?? ''),
       });
-      setForecast(days);
+
+      const days = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+      setForecast((wx.daily.time as string[]).map((d, i) => ({
+        date:       d,
+        weekday:    i === 0 ? 'Heute' : i === 1 ? 'Morgen' : days[new Date(d).getDay()],
+        weather_code: wx.daily.weather_code[i],
+        temp_max:   Math.round(wx.daily.temperature_2m_max[i]),
+        temp_min:   Math.round(wx.daily.temperature_2m_min[i]),
+        precip_prob: Math.round(wx.daily.precipitation_probability_mean?.[i] ?? 0),
+        uv_index:   Math.round(wx.daily.uv_index_max?.[i] ?? 0),
+      })));
     } catch {
       setError(true);
     }
     setLoading(false);
-  };
+  }, []);
 
-  useEffect(() => { fetchWeather(city); }, [city]);
+  useEffect(() => { fetchWeather(city); }, [city, fetchWeather]);
 
-  const handleCitySubmit = () => {
-    if (cityInput.trim()) {
-      setCity(cityInput.trim());
-      setEditCity(false);
-    }
-  };
+  const type = current ? wxType(current.weather_code) : 'cloud';
+  const bg   = BG[type];
 
-  const weatherType = current ? getWeatherType(current.weather_code) : 'cloud';
+  const timeStr = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  const dateStr = `${WDAYS[now.getDay()]}, ${now.getDate()}. ${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
 
   return (
     <WidgetWrapper widgetId="weather" title="Wetter" icon={<MapPin size={16} />}>
-      <div className={`weather-widget weather-bg-${weatherType}`}>
-        {/* Refresh-Button */}
-        <button
-          className="btn-icon weather-refresh"
-          onClick={() => fetchWeather(city)}
-          disabled={loading}
-          title="Aktualisieren"
-        >
-          <RefreshCw size={14} className={loading ? 'spin' : ''} />
-        </button>
+      <div className="wx-widget" style={{ background: bg }}>
 
-        {/* Loading */}
-        {loading && !current && (
-          <div className="weather-loading">
-            <RefreshCw size={28} className="spin" style={{ color: 'var(--color-weather)' }} />
-            <span>Wetterdaten laden…</span>
+        {/* Animated background particles */}
+        <Particles type={type} />
+
+        {/* All content sits above particles */}
+        <div className="wx-layer">
+
+          {/* ── HEADER ─────────────────────────────────── */}
+          <div className="wx-header">
+            <div className="wx-header-left">
+              <button
+                className="wx-city-btn"
+                onClick={() => { setEditCity(true); setCityInput(city); }}
+                title="Stadt ändern"
+              >
+                <MapPin size={10} />
+                <span>{current?.city || city}</span>
+              </button>
+              <div className="wx-date">{dateStr}</div>
+            </div>
+            <div className="wx-header-right">
+              {current && (
+                <div className="wx-header-stats">
+                  <span>💧 {current.humidity}%</span>
+                  <span>🌡 {current.pressure} hPa</span>
+                </div>
+              )}
+              {sunTimes && (
+                <div className="wx-header-stats">
+                  <span>🌅 {sunTimes.rise}</span>
+                  <span>🌇 {sunTimes.set}</span>
+                </div>
+              )}
+              <button
+                className="wx-refresh"
+                onClick={() => fetchWeather(city)}
+                disabled={loading}
+                title="Aktualisieren"
+              >
+                <RefreshCw size={11} className={loading ? 'spin' : ''} />
+              </button>
+            </div>
           </div>
-        )}
 
-        {/* Error */}
-        {!loading && error && !current && (
-          <div className="weather-error">
-            <span style={{ fontSize: 28 }}>🌫</span>
-            <p>Wetter konnte nicht geladen werden</p>
-            <button className="btn-primary" style={{ marginTop: 4 }} onClick={() => fetchWeather(city)}>
-              Erneut versuchen
-            </button>
-          </div>
-        )}
+          {/* ── LOADING / ERROR ────────────────────────── */}
+          {loading && !current && (
+            <div className="wx-state">
+              <RefreshCw size={30} className="spin" />
+              <span>Lade Wetterdaten…</span>
+            </div>
+          )}
+          {error && !current && (
+            <div className="wx-state">
+              <span style={{ fontSize: 30 }}>🌫</span>
+              <p>Wetter nicht verfügbar</p>
+              <button className="wx-retry" onClick={() => fetchWeather(city)}>Erneut versuchen</button>
+            </div>
+          )}
 
-        {/* Hauptinhalt */}
-        {current && (
-          <>
-            {/* Oberer Bereich: Hauptwetter */}
-            <div className="weather-hero">
-              <div className="weather-icon-animated">
-                <WeatherIcon type={weatherType} />
+          {/* ── MAIN AREA ──────────────────────────────── */}
+          {current && (
+            <div className="wx-main">
+              {/* Left: animated icon */}
+              <div className="wx-left">
+                <BigIcon type={type} />
               </div>
-              <div className="weather-hero-right">
-                <div className="weather-temp">{current.temp}°C</div>
-                <div className="weather-desc">{getWeatherDescription(current.weather_code)}</div>
+
+              {/* Right: time + temp + details */}
+              <div className="wx-right">
+                <div className="wx-clock">{timeStr}</div>
+                <div className="wx-temp">
+                  {current.temp}°<span className="wx-unit">C</span>
+                </div>
+                <div className="wx-desc-text">{wxDesc(current.weather_code)}</div>
+                <div className="wx-feels">Gefühlt: {current.feels_like}°C</div>
+                <div className="wx-wind-row">
+                  <span>💨 {current.wind_speed} km/h {windCompass(current.wind_dir)}</span>
+                  {forecast[0]?.uv_index !== undefined && (
+                    <span>UV: {forecast[0].uv_index}</span>
+                  )}
+                </div>
               </div>
             </div>
+          )}
 
-            {/* Details */}
-            <div className="weather-details-row">
-              <div className="weather-detail-item">
-                <Droplets size={13} />
-                <span>{current.humidity}%</span>
-              </div>
-              <div className="weather-detail-item">
-                <Wind size={13} />
-                <span>{current.wind_speed} km/h</span>
-              </div>
-              <div className="weather-detail-item">
-                <Thermometer size={13} />
-                <span>Gefühlt {current.feels_like}°C</span>
-              </div>
-            </div>
-
-            {/* 7-Tage Forecast */}
-            {forecast.length > 0 && (
-              <div className="weather-forecast-scroll">
-                {forecast.map((day) => (
-                  <div key={day.date} className="weather-forecast-card">
-                    <span className="weather-forecast-day">{day.weekday}</span>
-                    <SmallWeatherIcon type={getWeatherType(day.weather_code)} />
-                    <div className="weather-forecast-temps">
-                      <span className="weather-forecast-max">{day.temp_max}°</span>
-                      <span className="weather-forecast-min">{day.temp_min}°</span>
-                    </div>
-                    {day.precip_prob > 0 && (
-                      <span className="weather-forecast-precip">
-                        💧 {day.precip_prob}%
-                      </span>
-                    )}
+          {/* ── FORECAST STRIP ─────────────────────────── */}
+          {forecast.length > 0 && (
+            <div className="wx-forecast">
+              {forecast.map((day, i) => (
+                <div
+                  key={day.date}
+                  className={`wx-fday${i === 0 ? ' wx-fday-today' : ''}`}
+                >
+                  <div className="wx-fday-name">{day.weekday}</div>
+                  <MiniIcon type={wxType(day.weather_code)} />
+                  <div className="wx-fday-temps">
+                    <span className="wx-fday-hi">{day.temp_max}°</span>
+                    <span className="wx-fday-lo">/{day.temp_min}°</span>
                   </div>
-                ))}
-              </div>
-            )}
-
-            {/* Stadt-Zeile */}
-            <div
-              className="weather-city"
-              onClick={() => { setEditCity(true); setCityInput(city); }}
-              title="Stadt ändern"
-            >
-              <MapPin size={12} />
-              <span>{current.city}</span>
+                  {day.precip_prob > 10 && (
+                    <div className="wx-fday-rain">💧{day.precip_prob}%</div>
+                  )}
+                </div>
+              ))}
             </div>
-          </>
-        )}
+          )}
+        </div>
 
-        {/* Stadt-Eingabe */}
+        {/* ── CITY EDIT OVERLAY ─────────────────────── */}
         {editCity && (
-          <div className="weather-city-form">
-            <input
-              value={cityInput}
-              onChange={e => setCityInput(e.target.value)}
-              placeholder="Stadt eingeben"
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleCitySubmit();
-                if (e.key === 'Escape') setEditCity(false);
-              }}
-              autoFocus
-            />
-            <button className="btn-primary" onClick={handleCitySubmit}>OK</button>
+          <div className="wx-edit-overlay">
+            <div className="wx-edit-box">
+              <input
+                className="wx-edit-input"
+                value={cityInput}
+                onChange={e => setCityInput(e.target.value)}
+                placeholder="Stadt eingeben…"
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && cityInput.trim()) { setCity(cityInput.trim()); setEditCity(false); }
+                  if (e.key === 'Escape') setEditCity(false);
+                }}
+                autoFocus
+              />
+              <button
+                className="wx-edit-ok"
+                onClick={() => { if (cityInput.trim()) { setCity(cityInput.trim()); setEditCity(false); } }}
+              >OK</button>
+              <button className="wx-edit-cancel" onClick={() => setEditCity(false)}>✕</button>
+            </div>
           </div>
         )}
+
       </div>
     </WidgetWrapper>
   );

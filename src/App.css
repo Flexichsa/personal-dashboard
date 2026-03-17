@@ -5403,3 +5403,565 @@ button:focus:not(:focus-visible) { outline: none; }
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ==========================================================================
+   WX WEATHER WIDGET — Referenz-Design (Dark Atmospheric Style)
+   ========================================================================== */
+
+/* Widget fills the WidgetWrapper content area completely */
+.wx-widget {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 220px;
+  overflow: hidden;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Content layer sits above particles */
+.wx-layer {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 10px 14px 0;
+  color: #ffffff;
+  gap: 2px;
+}
+
+/* ── Particles overlay ─────────────────────────────────────────────────────── */
+
+.wx-particles {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Rain drops */
+.wx-raindrop {
+  position: absolute;
+  top: -20px;
+  background: linear-gradient(to bottom, transparent, rgba(147, 197, 253, 0.7));
+  border-radius: 1px;
+  animation: wx-rain-fall linear infinite;
+}
+.wx-raindrop-heavy {
+  background: linear-gradient(to bottom, transparent, rgba(147, 197, 253, 0.85));
+}
+@keyframes wx-rain-fall {
+  from { transform: translateY(-20px); }
+  to   { transform: translateY(calc(100vh + 20px)); }
+}
+
+/* Snow flakes */
+.wx-snowflake {
+  position: absolute;
+  top: -30px;
+  color: rgba(219, 234, 254, 0.85);
+  animation: wx-snow-fall linear infinite;
+  user-select: none;
+}
+@keyframes wx-snow-fall {
+  0%   { transform: translateY(-30px) rotate(0deg) translateX(0); }
+  33%  { transform: translateY(33vh) rotate(120deg) translateX(8px); }
+  66%  { transform: translateY(66vh) rotate(240deg) translateX(-8px); }
+  100% { transform: translateY(110vh) rotate(360deg) translateX(0); }
+}
+
+/* Thunder lightning flash */
+.wx-lightning-flash {
+  position: absolute;
+  inset: 0;
+  background: rgba(253, 224, 71, 0.06);
+  animation: wx-lightning 4s ease-in-out infinite;
+}
+@keyframes wx-lightning {
+  0%, 92%, 96%, 100% { opacity: 0; }
+  93%, 95% { opacity: 1; }
+}
+
+/* Sun glow */
+.wx-sun-glow-bg {
+  position: absolute;
+  bottom: -60px;
+  right: -40px;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.18) 0%, transparent 65%);
+  animation: wx-sun-pulse 3s ease-in-out infinite;
+}
+@keyframes wx-sun-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+
+/* ── Header ────────────────────────────────────────────────────────────────── */
+
+.wx-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.wx-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wx-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.wx-city-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 99px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 3px 10px 3px 7px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.wx-city-btn:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+.wx-date {
+  font-size: 10px;
+  color: rgba(255,255,255,0.55);
+  font-weight: 400;
+  padding-left: 2px;
+}
+
+.wx-header-stats {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  color: rgba(255,255,255,0.6);
+}
+
+.wx-refresh {
+  background: rgba(255,255,255,0.1);
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: rgba(255,255,255,0.6);
+  transition: background 0.15s, color 0.15s;
+  margin-top: 2px;
+}
+.wx-refresh:hover { background: rgba(255,255,255,0.22); color: #fff; }
+
+/* ── Loading / Error ───────────────────────────────────────────────────────── */
+
+.wx-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: rgba(255,255,255,0.7);
+  font-size: 13px;
+}
+
+.wx-retry {
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 16px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.wx-retry:hover { background: rgba(255,255,255,0.25); }
+
+/* ── Main area ─────────────────────────────────────────────────────────────── */
+
+.wx-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.wx-left {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 110px;
+}
+
+.wx-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.wx-clock {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  color: rgba(255,255,255,0.9);
+  line-height: 1;
+  font-feature-settings: "tnum" 1;
+}
+
+.wx-temp {
+  font-family: var(--font-display);
+  font-size: 52px;
+  font-weight: 200;
+  letter-spacing: -0.04em;
+  color: #ffffff;
+  line-height: 1;
+  font-feature-settings: "tnum" 1;
+}
+
+.wx-unit {
+  font-size: 24px;
+  font-weight: 300;
+  opacity: 0.75;
+  vertical-align: super;
+}
+
+.wx-desc-text {
+  font-size: 13px;
+  color: rgba(255,255,255,0.75);
+  font-weight: 400;
+}
+
+.wx-feels {
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+}
+
+.wx-wind-row {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.55);
+  margin-top: 2px;
+}
+
+/* ── Forecast strip ────────────────────────────────────────────────────────── */
+
+.wx-forecast {
+  display: flex;
+  gap: 0;
+  background: rgba(0,0,0,0.22);
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding: 6px 0 4px;
+  margin: 0 -14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.wx-forecast::-webkit-scrollbar { display: none; }
+
+.wx-fday {
+  flex: 1;
+  min-width: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 4px;
+  border-right: 1px solid rgba(255,255,255,0.06);
+  transition: background 0.15s;
+}
+.wx-fday:last-child { border-right: none; }
+.wx-fday:hover { background: rgba(255,255,255,0.06); }
+
+.wx-fday-today {
+  background: rgba(255,255,255,0.08);
+}
+
+.wx-fday-name {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.5);
+}
+.wx-fday-today .wx-fday-name {
+  color: rgba(255,255,255,0.85);
+}
+
+.wx-mini-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.wx-fday-temps {
+  display: flex;
+  align-items: baseline;
+  gap: 1px;
+}
+
+.wx-fday-hi {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.wx-fday-lo {
+  font-size: 10px;
+  color: rgba(255,255,255,0.45);
+}
+
+.wx-fday-rain {
+  font-size: 9px;
+  color: rgba(147, 197, 253, 0.8);
+  line-height: 1;
+}
+
+/* ── City edit overlay ─────────────────────────────────────────────────────── */
+
+.wx-edit-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.wx-edit-box {
+  display: flex;
+  gap: 8px;
+  padding: 16px;
+  width: 90%;
+  max-width: 280px;
+  background: rgba(15,25,40,0.92);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: var(--radius-md);
+}
+
+.wx-edit-input {
+  flex: 1;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 8px;
+  color: #fff;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.wx-edit-input::placeholder { color: rgba(255,255,255,0.35); }
+.wx-edit-input:focus { outline: none; border-color: rgba(255,255,255,0.4); }
+
+.wx-edit-ok {
+  background: rgba(255,255,255,0.18);
+  border: 1px solid rgba(255,255,255,0.25);
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.wx-edit-ok:hover { background: rgba(255,255,255,0.28); }
+
+.wx-edit-cancel {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.55);
+  border-radius: 8px;
+  width: 32px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.wx-edit-cancel:hover { color: #fff; }
+
+/* ── Big animated icons ────────────────────────────────────────────────────── */
+
+.wx-bigicon {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Sun */
+.wx-bigicon-sun { animation: wx-rotate-slow 12s linear infinite; }
+@keyframes wx-rotate-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.wx-sun-core {
+  width: 36px; height: 36px;
+  background: radial-gradient(circle, #FDE68A 40%, #FBBF24 100%);
+  border-radius: 50%;
+  box-shadow: 0 0 20px rgba(251,191,36,0.8), 0 0 40px rgba(251,191,36,0.4);
+  position: absolute;
+  animation: wx-sun-breathe 3s ease-in-out infinite;
+}
+.wx-sun-sm { width: 24px; height: 24px; top: 10px; right: 12px; }
+@keyframes wx-sun-breathe {
+  0%, 100% { box-shadow: 0 0 20px rgba(251,191,36,0.8), 0 0 40px rgba(251,191,36,0.4); }
+  50% { box-shadow: 0 0 30px rgba(251,191,36,1), 0 0 60px rgba(251,191,36,0.6); }
+}
+
+.wx-sun-ray {
+  position: absolute;
+  width: 3px; height: 14px;
+  background: linear-gradient(to bottom, #FDE68A, transparent);
+  border-radius: 2px;
+  top: 50%; left: 50%;
+  margin-left: -1.5px;
+  transform-origin: 1.5px 0;
+}
+.wx-sun-ray-sm { height: 9px; width: 2px; margin-left: -1px; }
+
+/* Cloud shape */
+.wx-cloud-shape {
+  width: 68px; height: 32px;
+  background: linear-gradient(135deg, #94A3B8 0%, #CBD5E1 100%);
+  border-radius: 16px;
+  position: absolute;
+  bottom: 20px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  animation: wx-cloud-drift 6s ease-in-out infinite;
+}
+.wx-cloud-shape::before {
+  content: '';
+  position: absolute;
+  width: 34px; height: 34px;
+  background: #CBD5E1;
+  border-radius: 50%;
+  top: -14px; left: 10px;
+}
+.wx-cloud-shape::after {
+  content: '';
+  position: absolute;
+  width: 24px; height: 24px;
+  background: #B8C4CF;
+  border-radius: 50%;
+  top: -10px; left: 30px;
+}
+.wx-cloud-dark {
+  background: linear-gradient(135deg, #475569 0%, #64748B 100%);
+}
+.wx-cloud-dark::before { background: #64748B; }
+.wx-cloud-dark::after  { background: #4F6070; }
+.wx-cloud-front {
+  bottom: 0; left: 14px;
+  width: 56px; height: 26px;
+  z-index: 2;
+}
+@keyframes wx-cloud-drift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(4px); }
+}
+
+/* Rain lines under cloud */
+.wx-icon-drops {
+  position: absolute;
+  bottom: 2px;
+  display: flex;
+  gap: 8px;
+}
+.wx-icon-drop {
+  width: 2px; height: 10px;
+  background: linear-gradient(to bottom, rgba(96,165,250,0.8), transparent);
+  border-radius: 1px;
+  animation: wx-icon-drop-fall 1s ease-in infinite;
+}
+.wx-icon-drop-0 { animation-delay: 0s; }
+.wx-icon-drop-1 { animation-delay: 0.2s; }
+.wx-icon-drop-2 { animation-delay: 0.1s; }
+.wx-icon-drop-3 { animation-delay: 0.35s; }
+.wx-icon-drop-4 { animation-delay: 0.15s; }
+@keyframes wx-icon-drop-fall {
+  0%   { transform: translateY(-4px); opacity: 1; }
+  100% { transform: translateY(12px); opacity: 0; }
+}
+
+/* Snow dots */
+.wx-icon-snowdot {
+  font-size: 11px;
+  color: rgba(186,230,253,0.9);
+  animation: wx-icon-snow-fall 1.8s ease-in infinite;
+}
+.wx-icon-snowdot-0 { animation-delay: 0s; }
+.wx-icon-snowdot-1 { animation-delay: 0.36s; }
+.wx-icon-snowdot-2 { animation-delay: 0.72s; }
+.wx-icon-snowdot-3 { animation-delay: 1.08s; }
+.wx-icon-snowdot-4 { animation-delay: 1.44s; }
+@keyframes wx-icon-snow-fall {
+  0%   { transform: translateY(-6px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(16px) rotate(180deg); opacity: 0; }
+}
+
+/* Thunder bolt */
+.wx-bolt-icon {
+  position: absolute;
+  bottom: 0;
+  font-size: 32px;
+  animation: wx-bolt-flash 2.5s ease-in-out infinite;
+  z-index: 3;
+}
+@keyframes wx-bolt-flash {
+  0%, 85%, 100% { opacity: 1; filter: drop-shadow(0 0 6px rgba(253,224,71,0.8)); }
+  87%, 89% { opacity: 0.2; }
+  88%, 90% { opacity: 1; filter: drop-shadow(0 0 16px rgba(253,224,71,1)); }
+}
+
+/* Fog bars */
+.wx-bigicon-fog { flex-direction: column; gap: 6px; }
+.wx-fog-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(148,163,184,0.6);
+  animation: wx-fog-drift 4s ease-in-out infinite;
+}
+.wx-fog-bar-0 { width: 70px; animation-delay: 0s; }
+.wx-fog-bar-1 { width: 55px; animation-delay: 0.5s; }
+.wx-fog-bar-2 { width: 65px; animation-delay: 1s; }
+.wx-fog-bar-3 { width: 48px; animation-delay: 1.5s; }
+@keyframes wx-fog-drift {
+  0%, 100% { transform: translateX(0); opacity: 0.6; }
+  50% { transform: translateX(6px); opacity: 0.9; }
+}
+
+/* Partly cloudy combo */
+.wx-bigicon-partly {
+  position: relative;
+}
+
+/* Weather widget: content area has no padding, widget fills it completely */
+.widget-weather .widget-content {
+  padding: 0 !important;
+  gap: 0 !important;
+  overflow: hidden;
+}
+.widget-weather .wx-widget {
+  flex: 1;
+  border-radius: 0 0 calc(var(--radius-lg) - 2px) calc(var(--radius-lg) - 2px);
+}
