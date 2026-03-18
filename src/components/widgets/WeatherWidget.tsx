@@ -346,7 +346,11 @@ export default function WeatherWidget() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchWeather(city); }, [city, fetchWeather]);
+  useEffect(() => {
+    fetchWeather(city);
+    const interval = setInterval(() => fetchWeather(city), 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [city, fetchWeather]);
 
   const type = current ? wxType(current.weather_code) : 'cloud';
   const bg   = BG[type];
