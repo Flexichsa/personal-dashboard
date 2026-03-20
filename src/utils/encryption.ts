@@ -8,16 +8,35 @@ export function encrypt(data: string, masterPassword: string): string {
 
 export function decrypt(encryptedData: string, masterPassword: string): string {
   const bytes = CryptoJS.AES.decrypt(encryptedData, masterPassword + SALT);
-  return bytes.toString(CryptoJS.enc.Utf8);
+  const result = bytes.toString(CryptoJS.enc.Utf8);
+  if (!result) throw new Error('Decryption failed');
+  return result;
 }
 
 export function hashPassword(password: string): string {
   return CryptoJS.SHA256(password + SALT).toString();
 }
 
-export function generatePassword(length: number = 16): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
-  const array = new Uint8Array(length);
-  crypto.getRandomValues(array);
-  return Array.from(array, (byte) => chars[byte % chars.length]).join('');
+export function generatePassword(
+  length: number = 16,
+  options: { upper?: boolean; lower?: boolean; numbers?: boolean; symbols?: boolean } = {}
+): string {
+  const { upper = true, lower = true, numbers = true, symbols = true } = options;
+  let chars = '';
+  if (lower) chars += 'abcdefghijklmnopqrstuvwxyz';
+  if (upper) chars += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  if (numbers) chars += '0123456789';
+  if (symbols) chars += '!@#$%^&*()_+-=[]{}|;:,.<>?';
+  if (!chars) chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const limit = 256 - (256 % chars.length);
+  const result: string[] = [];
+  while (result.length < length) {
+    const arr = new Uint8Array(length * 2);
+    crypto.getRandomValues(arr);
+    for (const byte of arr) {
+      if (byte < limit) result.push(chars[byte % chars.length]);
+      if (result.length === length) break;
+    }
+  }
+  return result.join('');
 }

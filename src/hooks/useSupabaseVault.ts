@@ -27,19 +27,16 @@ function saveLocal(hash: string, data: string): void {
 
 export function useSupabaseVault(): {
   masterHash: string;
-  setMasterHash: (value: string) => void;
   encryptedData: string;
-  setEncryptedData: (value: string) => void;
+  saveVault: (hash: string, data: string) => void;
   loading: boolean;
 } {
   const { user } = useAuth();
 
-  // Initialize from localStorage immediately (no flash, offline-safe)
   const [masterHash, setMasterHashLocal] = useState(() => loadLocal().hash);
   const [encryptedData, setEncryptedDataLocal] = useState(() => loadLocal().data);
   const [loading, setLoading] = useState(true);
 
-  // Fetch from Supabase on mount — merge with localStorage
   useEffect(() => {
     if (!user) {
       setLoading(false);
@@ -56,19 +53,16 @@ export function useSupabaseVault(): {
           .single();
 
         if (error && error.code !== 'PGRST116') {
-          // PGRST116 = no rows found (fine)
           console.error('[useSupabaseVault] Fetch error:', error.message);
           setLoading(false);
           return;
         }
 
         if (data && data.encrypted_data) {
-          // Supabase has data — use it (source of truth for cross-device)
           setMasterHashLocal(data.master_hash);
           setEncryptedDataLocal(data.encrypted_data);
           saveLocal(data.master_hash, data.encrypted_data);
         } else {
-          // Supabase empty — push local data up if exists
           const local = loadLocal();
           if (local.hash && local.data) {
             console.log('[useSupabaseVault] Syncing local vault to Supabase');
@@ -86,7 +80,6 @@ export function useSupabaseVault(): {
         }
       } catch (err) {
         console.error('[useSupabaseVault] Unexpected error:', err);
-        // Keep localStorage data as fallback
       }
       setLoading(false);
     };
@@ -94,16 +87,16 @@ export function useSupabaseVault(): {
     fetchVault();
   }, [user]);
 
-  const upsert = useCallback(
-    (hash: string, encrypted: string) => {
-      // Always save to localStorage immediately
-      saveLocal(hash, encrypted);
+  const saveVault = useCallback(
+    (hash: string, data: string) => {
+      setMasterHashLocal(hash);
+      setEncryptedDataLocal(data);
+      saveLocal(hash, data);
 
-      // Sync to Supabase if logged in
       if (!user) return;
       supabase
         .from('password_vaults')
-        .upsert({ user_id: user.id, master_hash: hash, encrypted_data: encrypted })
+        .upsert({ user_id: user.id, master_hash: hash, encrypted_data: data })
         .then(({ error }) => {
           if (error) {
             console.error('[useSupabaseVault] Upsert error:', error.message);
@@ -113,21 +106,5 @@ export function useSupabaseVault(): {
     [user],
   );
 
-  const setMasterHash = useCallback(
-    (value: string) => {
-      setMasterHashLocal(value);
-      upsert(value, encryptedData);
-    },
-    [upsert, encryptedData],
-  );
-
-  const setEncryptedData = useCallback(
-    (value: string) => {
-      setEncryptedDataLocal(value);
-      upsert(masterHash, value);
-    },
-    [upsert, masterHash],
-  );
-
-  return { masterHash, setMasterHash, encryptedData, setEncryptedData, loading };
+  return { masterHash, encryptedData, saveVault, loading };
 }
