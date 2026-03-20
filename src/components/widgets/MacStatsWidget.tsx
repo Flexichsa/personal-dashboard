@@ -270,7 +270,7 @@ export default function MacStatsWidget() {
     return () => clearInterval(t);
   }, [fetch_]);
 
-  const cpuColor = stats ? (stats.cpu > 80 ? 'var(--danger)' : stats.cpu > 50 ? 'var(--warning)' : '#7c3aed') : '#7c3aed';
+  const cpuColor = stats ? (stats.cpu > 80 ? 'var(--danger)' : stats.cpu > 50 ? 'var(--warning)' : 'var(--accent)') : 'var(--accent)';
   const ramColor = stats ? (stats.ramPct > 85 ? 'var(--danger)' : stats.ramPct > 65 ? 'var(--warning)' : 'var(--accent-secondary)') : 'var(--accent-secondary)';
 
   const TABS: { id: Tab; label: string }[] = [
@@ -502,7 +502,7 @@ export default function MacStatsWidget() {
                     <div className="macstats-proc-cpu">
                       <MiniBar
                         pct={p.cpu}
-                        color={p.cpu > 50 ? 'var(--danger)' : p.cpu > 20 ? 'var(--warning)' : '#7c3aed'}
+                        color={p.cpu > 50 ? 'var(--danger)' : p.cpu > 20 ? 'var(--warning)' : 'var(--accent)'}
                       />
                       <span>{p.cpu.toFixed(1)}%</span>
                     </div>

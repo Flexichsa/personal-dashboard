@@ -416,7 +416,7 @@ export default function PasswordVault() {
                     <input
                       type="checkbox"
                       checked={val}
-                      onChange={() => setGenOptions(o => ({ ...o, [key]: !o[key] }))}
+                      onChange={() => setGenOptions(o => ({ ...o, [key]: !o[key as keyof typeof o] }))}
                     />
                     <span>{key === 'upper' ? 'A-Z' : key === 'lower' ? 'a-z' : key === 'numbers' ? '0-9' : '!@#'}</span>
                   </label>

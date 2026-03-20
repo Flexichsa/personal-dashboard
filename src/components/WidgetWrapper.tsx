@@ -14,7 +14,6 @@ export default function WidgetWrapper({ title, icon, children, widgetId, onRemov
     <div className={`widget-wrapper ${widgetId ? `widget-${widgetId}` : ''}`} style={style}>
       <div className="widget-header">
         <div className="widget-title">
-          <span className="widget-accent-dot" />
           {icon}
           <span>{title}</span>
         </div>

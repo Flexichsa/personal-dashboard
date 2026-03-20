@@ -54,8 +54,8 @@ interface WidgetDef {
 }
 
 const WIDGET_DEFS: WidgetDef[] = [
-  { id: 'passwords', label: 'Passwort-Tresor', category: 'Sicherheit', icon: <Lock size={14} />, color: '#6366f1', component: <PasswordVault />, defaultW: 4, defaultH: 5, minW: 2, minH: 3 },
-  { id: 'contacts', label: 'Kontakte', category: 'Organisation', icon: <Users size={14} />, color: '#8b5cf6', component: <ContactsWidget />, defaultW: 4, defaultH: 5, minW: 2, minH: 3 },
+  { id: 'passwords', label: 'Passwort-Tresor', category: 'Sicherheit', icon: <Lock size={14} />, color: '#0d9488', component: <PasswordVault />, defaultW: 4, defaultH: 5, minW: 2, minH: 3 },
+  { id: 'contacts', label: 'Kontakte', category: 'Organisation', icon: <Users size={14} />, color: '#7c3aed', component: <ContactsWidget />, defaultW: 4, defaultH: 5, minW: 2, minH: 3 },
   { id: 'notes', label: 'Notizen', category: 'Produktivität', icon: <FileText size={14} />, color: '#f59e0b', component: <NotesWidget />, defaultW: 4, defaultH: 5, minW: 2, minH: 3 },
   { id: 'bookmarks', label: 'Lesezeichen', category: 'Organisation', icon: <Bookmark size={14} />, color: '#3b82f6', component: <BookmarksWidget />, defaultW: 4, defaultH: 4, minW: 2, minH: 2 },
   { id: 'calendar', label: 'Kalender', category: 'Organisation', icon: <Calendar size={14} />, color: '#ef4444', component: <CalendarWidget />, defaultW: 4, defaultH: 6, minW: 2, minH: 4 },
@@ -67,7 +67,7 @@ const WIDGET_DEFS: WidgetDef[] = [
   { id: 'pomodoro', label: 'Pomodoro', category: 'Produktivität', icon: <Timer size={14} />, color: '#ec4899', component: <PomodoroWidget />, defaultW: 4, defaultH: 5, minW: 2, minH: 3 },
   { id: 'quotes', label: 'Zitate', category: 'Tools', icon: <Quote size={14} />, color: '#14b8a6', component: <QuotesWidget />, defaultW: 4, defaultH: 3, minW: 2, minH: 2 },
   { id: 'finance', label: 'Finanzen', category: 'Tools', icon: <Wallet size={14} />, color: '#10b981', component: <FinanceWidget />, defaultW: 4, defaultH: 6, minW: 2, minH: 3 },
-  { id: 'hardware', label: 'Hardware', category: 'Organisation', icon: <Cpu size={14} />, color: '#6366f1', component: <HardwareWidget />, defaultW: 4, defaultH: 6, minW: 2, minH: 3 },
+  { id: 'hardware', label: 'Hardware', category: 'Organisation', icon: <Cpu size={14} />, color: '#818cf8', component: <HardwareWidget />, defaultW: 4, defaultH: 6, minW: 2, minH: 3 },
   { id: 'work-instructions', label: 'Arbeitsanweisungen', category: 'Produktivität', icon: <ClipboardList size={14} />, color: '#0ea5e9', component: <WorkInstructionsWidget />, defaultW: 4, defaultH: 6, minW: 2, minH: 3 },
   { id: 'crypto', label: 'Krypto', category: 'Finanzen', icon: <TrendingUp size={14} />, color: '#f59e0b', component: <CryptoWidget />, defaultW: 3, defaultH: 5, minW: 2, minH: 3 },
   { id: 'stocks', label: 'Aktien', category: 'Finanzen', icon: <BarChart2 size={14} />, color: '#34d399', component: <StocksWidget />, defaultW: 3, defaultH: 5, minW: 2, minH: 3 },
@@ -270,6 +270,18 @@ export default function App() {
 
   const { width, containerRef, mounted } = useContainerWidth({ initialWidth: typeof window !== 'undefined' ? window.innerWidth - 32 : 1200 });
   const windowWidth = useSyncExternalStore(widthStore.subscribe, widthStore.getSnapshot);
+
+  // Live greeting + date (updates every 60s)
+  const [greeting, setGreeting] = useState(getGreeting());
+  const [dateStr, setDateStr] = useState(formatDate());
+  useEffect(() => {
+    const id = setInterval(() => {
+      setGreeting(getGreeting());
+      setDateStr(formatDate());
+    }, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   const isMobile = windowWidth < 768;
   const isTablet = windowWidth >= 768 && windowWidth < 1200;
   const gridMargin = isMobile ? GRID_MARGIN_MOBILE : isTablet ? GRID_MARGIN_TABLET : GRID_MARGIN;
@@ -440,11 +452,11 @@ export default function App() {
             <h1>Personal Hub</h1>
           </div>
           <span className="header-greeting">
-            {getGreeting()}, {displayName}!
+            {greeting}, {displayName}!
           </span>
         </div>
         <div className="header-right">
-          <span className="header-date">{formatDate()}</span>
+          <span className="header-date">{dateStr}</span>
           {showMigration && (
             <button
               className="add-widget-btn migrate-btn"
