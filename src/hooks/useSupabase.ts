@@ -51,8 +51,21 @@ const TABLE_MAP: Record<string, string> = {
 
 const LS_PREFIX = 'dashboard_';
 
+// --- Migrate old localStorage keys (without prefix) to new prefixed keys ---
+function migrateOldKey(key: string): void {
+  const newKey = LS_PREFIX + key;
+  // Only migrate if new key is empty and old key has data
+  if (localStorage.getItem(newKey)) return;
+  const oldData = localStorage.getItem(key);
+  if (oldData) {
+    localStorage.setItem(newKey, oldData);
+    // Keep old key as backup, don't delete
+  }
+}
+
 // --- localStorage helpers ---
 function loadFromLocalStorage<T>(key: string): T[] | null {
+  migrateOldKey(key);
   try {
     const raw = localStorage.getItem(LS_PREFIX + key);
     if (raw) return JSON.parse(raw) as T[];
