@@ -54,7 +54,7 @@ interface WidgetDef {
 }
 
 const WIDGET_DEFS: WidgetDef[] = [
-  { id: 'passwords', label: 'Passwort-Tresor', category: 'Sicherheit', icon: <Lock size={14} />, color: '#a78bfa', component: <PasswordVault />, defaultW: 4, defaultH: 5, minW: 2, minH: 3 },
+  { id: 'passwords', label: 'Passwort-Tresor', category: 'Sicherheit', icon: <Lock size={14} />, color: '#0d9488', component: <PasswordVault />, defaultW: 4, defaultH: 5, minW: 2, minH: 3 },
   { id: 'contacts', label: 'Kontakte', category: 'Organisation', icon: <Users size={14} />, color: '#7c3aed', component: <ContactsWidget />, defaultW: 4, defaultH: 5, minW: 2, minH: 3 },
   { id: 'notes', label: 'Notizen', category: 'Produktivität', icon: <FileText size={14} />, color: '#f59e0b', component: <NotesWidget />, defaultW: 4, defaultH: 5, minW: 2, minH: 3 },
   { id: 'bookmarks', label: 'Lesezeichen', category: 'Organisation', icon: <Bookmark size={14} />, color: '#3b82f6', component: <BookmarksWidget />, defaultW: 4, defaultH: 4, minW: 2, minH: 2 },
@@ -65,7 +65,7 @@ const WIDGET_DEFS: WidgetDef[] = [
   { id: 'stickynotes', label: 'Schnellnotizen', category: 'Produktivität', icon: <StickyNote size={14} />, color: '#f97316', component: <StickyNotesWidget />, defaultW: 4, defaultH: 4, minW: 2, minH: 2 },
   { id: 'files', label: 'Dateien', category: 'Organisation', icon: <FolderOpen size={14} />, color: '#64748b', component: <FilesWidget />, defaultW: 4, defaultH: 4, minW: 2, minH: 3 },
   { id: 'pomodoro', label: 'Pomodoro', category: 'Produktivität', icon: <Timer size={14} />, color: '#ec4899', component: <PomodoroWidget />, defaultW: 4, defaultH: 5, minW: 2, minH: 3 },
-  { id: 'quotes', label: 'Zitate', category: 'Tools', icon: <Quote size={14} />, color: '#2dd4bf', component: <QuotesWidget />, defaultW: 4, defaultH: 3, minW: 2, minH: 2 },
+  { id: 'quotes', label: 'Zitate', category: 'Tools', icon: <Quote size={14} />, color: '#14b8a6', component: <QuotesWidget />, defaultW: 4, defaultH: 3, minW: 2, minH: 2 },
   { id: 'finance', label: 'Finanzen', category: 'Tools', icon: <Wallet size={14} />, color: '#10b981', component: <FinanceWidget />, defaultW: 4, defaultH: 6, minW: 2, minH: 3 },
   { id: 'hardware', label: 'Hardware', category: 'Organisation', icon: <Cpu size={14} />, color: '#818cf8', component: <HardwareWidget />, defaultW: 4, defaultH: 6, minW: 2, minH: 3 },
   { id: 'work-instructions', label: 'Arbeitsanweisungen', category: 'Produktivität', icon: <ClipboardList size={14} />, color: '#0ea5e9', component: <WorkInstructionsWidget />, defaultW: 4, defaultH: 6, minW: 2, minH: 3 },
