@@ -20,6 +20,12 @@ const CATEGORY_COLORS: Record<string, string> = {
   work: '#fbbf24',
   server: '#fb923c',
   sonstiges: '#94a3b8',
+  'api-keys': '#f472b6',
+  'kneuss-apps': '#fb923c',
+  datenbanken: '#06b6d4',
+  azure: '#0078d4',
+  github: '#8b5cf6',
+  'eigene apps': '#10b981',
 };
 
 function getCategoryColor(category?: string): string {
@@ -27,10 +33,64 @@ function getCategoryColor(category?: string): string {
   return CATEGORY_COLORS[category.toLowerCase()] || 'var(--color-passwords)';
 }
 
+// Static logo mapping for known services (title keyword → logo URL)
+const SERVICE_LOGOS: Record<string, string> = {
+  supabase: 'https://supabase.com/favicon/favicon-32x32.png',
+  github: 'https://github.githubassets.com/favicons/favicon.png',
+  openai: 'https://cdn.oaistatic.com/assets/favicon-miwm3e3e.svg',
+  azure: 'https://portal.azure.com/favicon.ico',
+  vercel: 'https://vercel.com/favicon.ico',
+  'n8n': 'https://n8n.io/favicon.ico',
+  docker: 'https://www.docker.com/favicon.ico',
+  google: 'https://www.google.com/favicon.ico',
+  outlook: 'https://outlook.live.com/favicon.ico',
+  microsoft: 'https://www.microsoft.com/favicon.ico',
+  slack: 'https://a.slack-edge.com/80588/marketing/img/meta/favicon-32.png',
+  notion: 'https://www.notion.so/images/favicon.ico',
+  gitlab: 'https://gitlab.com/assets/favicon-72a2cad5025aa931d6ea56c3201d1f18e68a8571999c0.png',
+  bitbucket: 'https://bitbucket.org/favicon.ico',
+  aws: 'https://a0.awsstatic.com/libra-css/images/site/fav/favicon.ico',
+  cloudflare: 'https://www.cloudflare.com/favicon.ico',
+  stripe: 'https://stripe.com/favicon.ico',
+  firebase: 'https://firebase.google.com/favicon.ico',
+  jira: 'https://jira.atlassian.com/favicon.ico',
+  npm: 'https://static-production.npmjs.com/b0f1a8318363185cc2ea6a40ac23eeb2.png',
+  linkedin: 'https://static.licdn.com/aero-v1/sc/h/al2o9zrvru7aqj8e1x2rzsrca',
+  twitter: 'https://abs.twimg.com/favicons/twitter.3.ico',
+  discord: 'https://discord.com/assets/favicon.ico',
+  reddit: 'https://www.reddit.com/favicon.ico',
+  wordpress: 'https://s1.wp.com/i/favicon.ico',
+  grafana: 'https://grafana.com/static/assets/img/fav32.png',
+  postgres: 'https://www.postgresql.org/favicon.ico',
+  mongodb: 'https://www.mongodb.com/assets/images/global/favicon.ico',
+  redis: 'https://redis.io/favicon.ico',
+  ssh: 'https://www.openssh.com/favicon.ico',
+};
+
+function getServiceLogo(title?: string, url?: string): string | null {
+  // 1. Check title against known service logos
+  if (title) {
+    const lower = title.toLowerCase();
+    for (const [keyword, logoUrl] of Object.entries(SERVICE_LOGOS)) {
+      if (lower.includes(keyword)) return logoUrl;
+    }
+  }
+  // 2. Check URL against known service logos
+  if (url) {
+    const lower = url.toLowerCase();
+    for (const [keyword, logoUrl] of Object.entries(SERVICE_LOGOS)) {
+      if (lower.includes(keyword)) return logoUrl;
+    }
+  }
+  return null;
+}
+
 function getFaviconUrl(url?: string): string | null {
   if (!url) return null;
   try {
     const hostname = new URL(url.startsWith('http') ? url : `https://${url}`).hostname;
+    // Skip localhost and internal hosts — Google favicon won't find them
+    if (hostname === 'localhost' || hostname.endsWith('.local') || hostname.includes('intra.')) return null;
     return `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
   } catch {
     return null;
@@ -479,7 +539,9 @@ export default function PasswordVault() {
               </div>
             )}
             {items.map((entry, idx) => {
+              const serviceLogo = getServiceLogo(entry.title, entry.url);
               const favicon = getFaviconUrl(entry.url);
+              const logoSrc = serviceLogo || favicon;
               const catColor = getCategoryColor(entry.category);
               return (
                 <div
@@ -492,8 +554,24 @@ export default function PasswordVault() {
                 >
                   <div className="vault-entry-main">
                     <div className="vault-entry-icon" style={{ background: `${catColor}20` }}>
-                      {favicon ? (
-                        <img src={favicon} alt="" width={18} height={18} loading="lazy" />
+                      {logoSrc ? (
+                        <img
+                          src={logoSrc}
+                          alt=""
+                          width={18}
+                          height={18}
+                          loading="lazy"
+                          onError={(e) => {
+                            // Fallback: try Google favicon, then hide
+                            const img = e.currentTarget;
+                            if (serviceLogo && favicon && img.src !== favicon) {
+                              img.src = favicon;
+                            } else {
+                              img.style.display = 'none';
+                              img.parentElement?.classList.add('vault-icon-fallback');
+                            }
+                          }}
+                        />
                       ) : (
                         <Key size={16} style={{ color: catColor }} />
                       )}
