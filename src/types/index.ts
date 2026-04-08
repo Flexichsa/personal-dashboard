@@ -157,6 +157,16 @@ export interface WorkInstruction {
   updatedAt: number;
 }
 
+// Document Renamer types
+export interface RenameEntry {
+  id: string;
+  originalName: string;
+  newName: string;
+  fileType: string;
+  fileSize: number;
+  createdAt: number;
+}
+
 // Widget layout
 export interface WidgetConfig {
   i: string;

@@ -62,6 +62,65 @@ function parseJson<T>(text: string): T | null {
   }
 }
 
+// --- Dokumentname generieren ---
+export interface DocNameResult {
+  date: string;
+  description: string;
+}
+
+export async function generateDocumentName(
+  content: MessageContent,
+  apiKey: string,
+): Promise<DocNameResult> {
+  const today = new Date().toISOString().slice(0, 10);
+  const prompt = typeof content === 'string'
+    ? `Du bist ein Dokumenten-Klassifizierer. Analysiere den folgenden Dokumentinhalt und erstelle einen kurzen, präzisen deutschen Dateinamen.
+
+Regeln:
+- Kebab-Case (kleinbuchstaben, wörter mit bindestrich verbunden)
+- Maximal 5 Wörter
+- Keine Sonderzeichen, Umlaute ersetzen (ä→ae, ö→oe, ü→ue, ß→ss)
+- Beschreibe den INHALT/TYP des Dokuments, nicht die Formatierung
+- Wenn ein Datum im Dokument erkennbar ist (Rechnungsdatum, Vertragsdatum etc.), extrahiere es
+- Beispiele: "mietvertrag-wohnung-zurich", "rechnung-swisscom-maerz", "lebenslauf-max-mustermann"
+
+Dokumentinhalt:
+${content.slice(0, 3000)}
+
+Antworte NUR mit JSON: {"date": "YYYY-MM-DD", "description": "kebab-case-name"}
+Falls kein Datum erkennbar: {"date": "${today}", "description": "..."}
+Keine Erklärung.`
+    : content;
+
+  let finalContent: MessageContent = typeof content === 'string' ? prompt : content;
+
+  if (typeof content !== 'string') {
+    const textBlock = {
+      type: 'text',
+      text: `Analysiere dieses Dokument-Bild und erstelle einen kurzen, präzisen deutschen Dateinamen.
+
+Regeln:
+- Kebab-Case (kleinbuchstaben, wörter mit bindestrich verbunden)
+- Maximal 5 Wörter
+- Keine Sonderzeichen, Umlaute ersetzen (ä→ae, ö→oe, ü→ue, ß→ss)
+- Beschreibe den INHALT/TYP des Dokuments, nicht die Formatierung
+- Wenn ein Datum im Dokument erkennbar ist, extrahiere es
+
+Antworte NUR mit JSON: {"date": "YYYY-MM-DD", "description": "kebab-case-name"}
+Falls kein Datum erkennbar: {"date": "${today}", "description": "..."}
+Keine Erklärung.`,
+    };
+    finalContent = [...(content as Array<{ type: string; text?: string; image_url?: { url: string } }>), textBlock];
+  }
+
+  const reply = await callOpenAI(apiKey, finalContent);
+  const parsed = parseJson<DocNameResult>(reply);
+  if (parsed?.description) return parsed;
+  // Fallback: Antwort als reinen Beschreibungstext behandeln
+  const cleaned = reply.replace(/[^a-z0-9\-]/gi, '-').toLowerCase().replace(/-+/g, '-').replace(/^-|-$/g, '');
+  return { date: today, description: cleaned || 'dokument' };
+}
+
 // --- Kontakt aus Text ---
 export async function extractContactFromText(
   text: string,

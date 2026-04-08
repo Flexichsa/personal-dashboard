@@ -4,7 +4,7 @@ import type { ResponsiveLayouts, Layout } from 'react-grid-layout';
 import {
   Lock, Users, FileText, Bookmark, Calendar, CheckSquare,
   Cloud, Clock, StickyNote, FolderOpen, Timer, Quote, Wallet, Cpu, ClipboardList,
-  TrendingUp, BarChart2, Newspaper, Music, Monitor,
+  TrendingUp, BarChart2, Newspaper, Music, Monitor, FileSignature,
   Plus, LayoutGrid, LogOut, Upload, Search, Sun, Moon, RotateCcw
 } from 'lucide-react';
 import 'react-grid-layout/css/styles.css';
@@ -32,6 +32,7 @@ import NewsWidget from './components/widgets/NewsWidget';
 import FocusMusicWidget from './components/widgets/FocusMusicWidget';
 import MacDashboardWidget from './components/widgets/MacDashboardWidget';
 import MacStatsWidget from './components/widgets/MacStatsWidget';
+import DocumentRenamerWidget from './components/widgets/DocumentRenamerWidget';
 
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { usePages } from './hooks/usePages';
@@ -75,6 +76,7 @@ const WIDGET_DEFS: WidgetDef[] = [
   { id: 'music', label: 'Focus Music', category: 'Medien', icon: <Music size={14} />, color: '#ec4899', component: <FocusMusicWidget />, defaultW: 3, defaultH: 5, minW: 2, minH: 3 },
   { id: 'macdashboard', label: 'Mac Dashboard', category: 'System', icon: <Monitor size={14} />, color: '#22d3ee', component: <MacDashboardWidget />, defaultW: 12, defaultH: 10, minW: 6, minH: 5 },
   { id: 'macstats', label: 'Mac Stats', category: 'System', icon: <Monitor size={14} />, color: '#22d3ee', component: <MacStatsWidget />, defaultW: 3, defaultH: 8, minW: 2, minH: 6 },
+  { id: 'doc-renamer', label: 'Dok. Umbenennen', category: 'Tools', icon: <FileSignature size={14} />, color: '#d946ef', component: <DocumentRenamerWidget />, defaultW: 4, defaultH: 5, minW: 2, minH: 3 },
 ];
 
 const CATEGORIES = ['Produktivität', 'Organisation', 'Tools', 'Sicherheit', 'Finanzen', 'Medien', 'System'];
