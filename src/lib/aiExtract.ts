@@ -65,30 +65,39 @@ function parseJson<T>(text: string): T | null {
 // --- Dokumentname generieren ---
 export interface DocNameResult {
   date: string;
+  company: string;
   description: string;
 }
+
+const DOC_NAME_RULES = `Regeln:
+- Kebab-Case (kleinbuchstaben, wörter mit bindestrich verbunden)
+- Keine Sonderzeichen, Umlaute ersetzen (ä→ae, ö→oe, ü→ue, ß→ss)
+- "company": Firmenname/Absender des Dokuments (max 2 Wörter, kebab-case). Leer lassen wenn nicht erkennbar.
+- "description": INHALT/TYP des Dokuments kurz und präzise (max 4 Wörter, kebab-case)
+- Wenn ein Datum im Dokument erkennbar ist (Rechnungsdatum, Vertragsdatum etc.), extrahiere es
+- Beispiele:
+  {"date":"2026-03-15","company":"swisscom","description":"rechnung-maerz"}
+  {"date":"2025-01-10","company":"zurich-versicherung","description":"mietvertrag-wohnung"}
+  {"date":"2026-04-08","company":"","description":"lebenslauf-max-mustermann"}`;
 
 export async function generateDocumentName(
   content: MessageContent,
   apiKey: string,
 ): Promise<DocNameResult> {
   const today = new Date().toISOString().slice(0, 10);
-  const prompt = typeof content === 'string'
-    ? `Du bist ein Dokumenten-Klassifizierer. Analysiere den folgenden Dokumentinhalt und erstelle einen kurzen, präzisen deutschen Dateinamen.
+  const jsonFormat = `{"date": "YYYY-MM-DD", "company": "firmenname", "description": "kebab-case-name"}`;
+  const fallbackNote = `Falls kein Datum erkennbar: date = "${today}". Falls keine Firma erkennbar: company = "".`;
 
-Regeln:
-- Kebab-Case (kleinbuchstaben, wörter mit bindestrich verbunden)
-- Maximal 5 Wörter
-- Keine Sonderzeichen, Umlaute ersetzen (ä→ae, ö→oe, ü→ue, ß→ss)
-- Beschreibe den INHALT/TYP des Dokuments, nicht die Formatierung
-- Wenn ein Datum im Dokument erkennbar ist (Rechnungsdatum, Vertragsdatum etc.), extrahiere es
-- Beispiele: "mietvertrag-wohnung-zurich", "rechnung-swisscom-maerz", "lebenslauf-max-mustermann"
+  const prompt = typeof content === 'string'
+    ? `Du bist ein Dokumenten-Klassifizierer. Analysiere den folgenden Dokumentinhalt.
+
+${DOC_NAME_RULES}
 
 Dokumentinhalt:
 ${content.slice(0, 3000)}
 
-Antworte NUR mit JSON: {"date": "YYYY-MM-DD", "description": "kebab-case-name"}
-Falls kein Datum erkennbar: {"date": "${today}", "description": "..."}
+Antworte NUR mit JSON: ${jsonFormat}
+${fallbackNote}
 Keine Erklärung.`
     : content;
 
@@ -97,17 +106,12 @@ Keine Erklärung.`
   if (typeof content !== 'string') {
     const textBlock = {
       type: 'text',
-      text: `Analysiere dieses Dokument-Bild und erstelle einen kurzen, präzisen deutschen Dateinamen.
+      text: `Analysiere dieses Dokument-Bild.
 
-Regeln:
-- Kebab-Case (kleinbuchstaben, wörter mit bindestrich verbunden)
-- Maximal 5 Wörter
-- Keine Sonderzeichen, Umlaute ersetzen (ä→ae, ö→oe, ü→ue, ß→ss)
-- Beschreibe den INHALT/TYP des Dokuments, nicht die Formatierung
-- Wenn ein Datum im Dokument erkennbar ist, extrahiere es
+${DOC_NAME_RULES}
 
-Antworte NUR mit JSON: {"date": "YYYY-MM-DD", "description": "kebab-case-name"}
-Falls kein Datum erkennbar: {"date": "${today}", "description": "..."}
+Antworte NUR mit JSON: ${jsonFormat}
+${fallbackNote}
 Keine Erklärung.`,
     };
     finalContent = [...(content as Array<{ type: string; text?: string; image_url?: { url: string } }>), textBlock];
@@ -115,10 +119,10 @@ Keine Erklärung.`,
 
   const reply = await callOpenAI(apiKey, finalContent);
   const parsed = parseJson<DocNameResult>(reply);
-  if (parsed?.description) return parsed;
+  if (parsed?.description) return { date: parsed.date || today, company: parsed.company || '', description: parsed.description };
   // Fallback: Antwort als reinen Beschreibungstext behandeln
   const cleaned = reply.replace(/[^a-z0-9\-]/gi, '-').toLowerCase().replace(/-+/g, '-').replace(/^-|-$/g, '');
-  return { date: today, description: cleaned || 'dokument' };
+  return { date: today, company: '', description: cleaned || 'dokument' };
 }
 
 // --- Kontakt aus Text ---

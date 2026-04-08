@@ -6483,6 +6483,12 @@ button:focus:not(:focus-visible) { outline: none; }
   color: var(--text-muted);
   flex-shrink: 0;
 }
+.docr-company {
+  width: 80px;
+  flex-shrink: 0;
+  font-size: 12px;
+  padding: 5px 6px;
+}
 .docr-desc {
   flex: 1;
   min-width: 0;

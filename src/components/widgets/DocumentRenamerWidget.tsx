@@ -24,6 +24,7 @@ export default function DocumentRenamerWidget() {
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [company, setCompany] = useState('');
   const [description, setDescription] = useState('');
   const [extension, setExtension] = useState('');
   const [history, setHistory] = useLocalStorage<RenameEntry[]>('rename-history', []);
@@ -40,6 +41,7 @@ export default function DocumentRenamerWidget() {
     if (!apiKey) {
       // Fallback: manueller Modus
       setDate(new Date().toISOString().slice(0, 10));
+      setCompany('');
       setDescription(sanitizeFileName(droppedFile.name.replace(/\.[^.]+$/, '')));
       setStatus('reviewing');
       return;
@@ -88,6 +90,7 @@ export default function DocumentRenamerWidget() {
       setProgress('KI analysiert Inhalt...');
       const result = await generateDocumentName(aiContent, apiKey);
       setDate(result.date);
+      setCompany(sanitizeFileName(result.company));
       setDescription(sanitizeFileName(result.description));
       setStatus('reviewing');
     } catch (err) {
@@ -95,6 +98,7 @@ export default function DocumentRenamerWidget() {
       setError(err instanceof Error ? err.message : 'Analyse fehlgeschlagen');
       // Fallback auf manuellen Modus
       setDate(new Date().toISOString().slice(0, 10));
+      setCompany('');
       setDescription(sanitizeFileName(droppedFile.name.replace(/\.[^.]+$/, '')));
       setStatus('reviewing');
     }
@@ -135,7 +139,8 @@ export default function DocumentRenamerWidget() {
 
   const getNewFileName = () => {
     const ext = extension ? `.${extension}` : '';
-    return `${date}_${description}${ext}`;
+    const parts = [date, company, description].filter(Boolean);
+    return `${parts.join('_')}${ext}`;
   };
 
   const handleDownload = () => {
@@ -167,6 +172,7 @@ export default function DocumentRenamerWidget() {
     setProgress('');
     setError('');
     setDate(new Date().toISOString().slice(0, 10));
+    setCompany('');
     setDescription('');
     setExtension('');
   };
@@ -263,6 +269,14 @@ export default function DocumentRenamerWidget() {
                 value={date}
                 onChange={e => setDate(e.target.value)}
                 className="docr-date"
+              />
+              <span className="docr-sep">_</span>
+              <input
+                type="text"
+                value={company}
+                onChange={e => setCompany(sanitizeFileName(e.target.value))}
+                placeholder="firma"
+                className="docr-company"
               />
               <span className="docr-sep">_</span>
               <input
