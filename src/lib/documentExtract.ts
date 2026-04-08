@@ -1,8 +1,9 @@
 // Dokument-Inhaltsextraktion für verschiedene Dateitypen
 import * as pdfjsLib from 'pdfjs-dist';
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-// PDF.js Worker via CDN
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+// PDF.js Worker lokal aus node_modules
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 // --- File → Base64 ---
 export function fileToBase64(file: File): Promise<{ base64: string; mimeType: string }> {
