@@ -11,6 +11,7 @@ import type { PasswordEntry } from '../../types';
 
 const PRESET_CATEGORIES = ['Email', 'Social', 'Banking', 'Shopping', 'Work', 'Server', 'Sonstiges'];
 const AUTO_LOCK_MS = 5 * 60 * 1000; // 5 Minuten
+const SESSION_KEY = 'vault_session_key'; // Für Fullscreen-Sync: Master-Key in sessionStorage teilen
 
 const CATEGORY_COLORS: Record<string, string> = {
   email: '#60a5fa',
@@ -155,6 +156,21 @@ export default function PasswordVault() {
   const autoLockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
 
+  // Auto-Unlock: Wenn eine andere Instanz (z.B. Grid-Widget) bereits entsperrt hat,
+  // den Master-Key aus sessionStorage übernehmen (für Fullscreen-Modus)
+  useEffect(() => {
+    if (unlocked || !masterHash || !encryptedData) return;
+    try {
+      const sessionKey = sessionStorage.getItem(SESSION_KEY);
+      if (!sessionKey) return;
+      if (hashPassword(sessionKey) !== masterHash) return;
+      const decrypted = decrypt(encryptedData, sessionKey);
+      setEntries(JSON.parse(decrypted));
+      setMasterKey(sessionKey);
+      setUnlocked(true);
+    } catch { /* Session-Key ungültig — ignorieren */ }
+  }, [masterHash, encryptedData]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Auto-Lock nach Inaktivitaet
   const resetAutoLock = useCallback(() => {
     if (!unlocked) return;
@@ -162,6 +178,7 @@ export default function PasswordVault() {
     autoLockTimer.current = setTimeout(() => {
       setUnlocked(false);
       setMasterKey('');
+      sessionStorage.removeItem(SESSION_KEY);
       setEntries([]);
       setVisiblePasswords(new Set());
       setSearch('');
@@ -196,6 +213,7 @@ export default function PasswordVault() {
     setMasterKey(masterInput);
     setEntries([]);
     setUnlocked(true);
+    sessionStorage.setItem(SESSION_KEY, masterInput);
     setMasterInput('');
     setError('');
   };
@@ -211,6 +229,7 @@ export default function PasswordVault() {
       setEntries(JSON.parse(decrypted));
       setMasterKey(masterInput);
       setUnlocked(true);
+      sessionStorage.setItem(SESSION_KEY, masterInput);
       setMasterInput('');
       setError('');
     } catch {
@@ -221,6 +240,7 @@ export default function PasswordVault() {
   const handleLock = () => {
     setUnlocked(false);
     setMasterKey('');
+    sessionStorage.removeItem(SESSION_KEY);
     setEntries([]);
     setVisiblePasswords(new Set());
     setSearch('');

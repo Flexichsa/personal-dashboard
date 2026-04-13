@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { v4 as uuid } from 'uuid';
 import {
   Users, Plus, Search, Trash2, Mail, Phone, Building, Tag,
