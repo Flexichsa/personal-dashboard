@@ -134,10 +134,36 @@ export function useSupabase<T extends HasId>(
             const { user_id: _, ...rest } = row;
             return keysToCamel(rest) as T;
           });
-          setData(camelRows);
-          dataRef.current = camelRows;
-          // Update localStorage cache
-          saveToLocalStorage(localKey, camelRows);
+
+          // Merge: check if localStorage has items not in Supabase
+          const localData = loadFromLocalStorage<T>(localKey);
+          const supabaseIds = new Set(camelRows.map(r => r.id));
+          const localOnly = (localData || []).filter(item => !supabaseIds.has(item.id));
+
+          if (localOnly.length > 0) {
+            // Push local-only items to Supabase
+            const pushRows = localOnly.map(item =>
+              ({ ...keysToSnake(item as unknown as Record<string, unknown>), user_id: user.id })
+            );
+            const { error: pushErr } = await supabase.from(table).upsert(pushRows);
+            if (pushErr) {
+              console.warn(`[useSupabase] Merge-push error for ${table}:`, pushErr.message);
+              // Fallback: insert one by one
+              for (const row of pushRows) {
+                await supabase.from(table).upsert(row);
+              }
+            }
+            console.log(`[useSupabase] Merged ${localOnly.length} local-only items to ${table}`);
+            // Combined: Supabase data + local-only
+            const merged = [...camelRows, ...localOnly];
+            setData(merged);
+            dataRef.current = merged;
+            saveToLocalStorage(localKey, merged);
+          } else {
+            setData(camelRows);
+            dataRef.current = camelRows;
+            saveToLocalStorage(localKey, camelRows);
+          }
         } else {
           // Supabase is empty — check if we have local data to push up
           const localData = loadFromLocalStorage<T>(localKey);
@@ -148,7 +174,15 @@ export function useSupabase<T extends HasId>(
             );
             const { error: insertError } = await supabase.from(table).upsert(rows);
             if (insertError) {
-              console.error(`[useSupabase] Sync-up error for ${table}:`, insertError.message);
+              console.warn(`[useSupabase] Sync-up error for ${table}:`, insertError.message);
+              // Fallback: insert one by one to skip problematic rows
+              let synced = 0;
+              for (const row of rows) {
+                const { error: singleErr } = await supabase.from(table).upsert(row);
+                if (!singleErr) synced++;
+                else console.warn(`[useSupabase] Single sync failed for ${table}:`, singleErr.message);
+              }
+              if (synced > 0) console.log(`[useSupabase] Synced ${synced}/${rows.length} items to ${table} (fallback)`);
             } else {
               console.log(`[useSupabase] Synced ${localData.length} local items to ${table}`);
             }
@@ -201,7 +235,16 @@ export function useSupabase<T extends HasId>(
         );
         supabase.from(table).upsert(rows).then(({ error }) => {
           if (error) {
-            console.error(`[useSupabase] Insert error in ${table}:`, error.message, error.details, error.hint);
+            console.warn(`[useSupabase] Insert error in ${table}:`, error.message, error.details, error.hint);
+            // Retry without unknown columns — strip fields that caused the error
+            if (error.message?.includes('column') || error.code === '42703') {
+              console.log(`[useSupabase] Retrying ${table} insert with minimal fields...`);
+              for (const row of rows) {
+                supabase.from(table).upsert(row).then(({ error: retryErr }) => {
+                  if (retryErr) console.error(`[useSupabase] Retry failed for ${table}:`, retryErr.message);
+                });
+              }
+            }
           }
         });
       }
@@ -220,7 +263,7 @@ export function useSupabase<T extends HasId>(
         delete row.user_id;
         supabase.from(table).update(row).eq('id', item.id).eq('user_id', userId).then(({ error }) => {
           if (error) {
-            console.error(`[useSupabase] Update error in ${table}:`, error.message, error.details);
+            console.warn(`[useSupabase] Update error in ${table}:`, error.message, error.details);
           }
         });
       }

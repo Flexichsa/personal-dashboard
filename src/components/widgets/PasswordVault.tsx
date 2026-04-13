@@ -153,6 +153,7 @@ export default function PasswordVault() {
   const [form, setForm] = useState({ title: '', username: '', password: '', url: '', category: '', notes: '' });
 
   const autoLockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
 
   // Auto-Lock nach Inaktivitaet
   const resetAutoLock = useCallback(() => {
@@ -240,6 +241,10 @@ export default function PasswordVault() {
     });
     setShowForm(true);
     setSubmitted(false);
+    // Nach oben scrollen damit das Formular sichtbar wird
+    requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
   };
 
   const handleSave = () => {
@@ -405,7 +410,7 @@ export default function PasswordVault() {
       </div>
 
       {showForm && (
-        <div className="vault-form">
+        <div className="vault-form" ref={formRef}>
           <div className="vault-form-header">
             <span>{editId ? 'Eintrag bearbeiten' : 'Neuer Eintrag'}</span>
           </div>

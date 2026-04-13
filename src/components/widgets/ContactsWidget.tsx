@@ -168,13 +168,6 @@ export default function ContactsWidget() {
 
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const collapsedInitialized = useRef(false);
-  useEffect(() => {
-    if (!collapsedInitialized.current && companies.length > 0) {
-      collapsedInitialized.current = true;
-      setCollapsed(new Set([...companies.map(co => co.id), '__unlinked__']));
-    }
-  }, [companies]);
   const [confirmDeleteContact, setConfirmDeleteContact] = useState<string | null>(null);
   const [confirmDeleteCompany, setConfirmDeleteCompany] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
